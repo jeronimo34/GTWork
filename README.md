@@ -1,3 +1,5 @@
+I have written GTWork code on js/imageLoad.js.
+
 *finished<br>
 Load image<br>
 binalize<br>
