@@ -1,10 +1,10 @@
-*finished
-Load image
-binalize
-negative
-Extract contours <- I have only a little confidence in my answer.
+*finished<br>
+Load image<br>
+binalize<br>
+negative<br>
+Extract contours <- I have only a little confidence in my answer.<br>
 
-*TO DO
-Compute the signed distance
-Extrude the 2d signed distance
-~~~
+*TO DO<br>
+Compute the signed distance<br>
+Extrude the 2d signed distance<br>
+~~~<br>
