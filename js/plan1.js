@@ -235,7 +235,7 @@ onload = function(){
     //イメージを白黒画像にして出力
         console.log("w" + image.width);
         console.log("h" + image.height);
-        
+        //
         //キャンバスに画像をセット
         var canvas = document.getElementById('canvas');
         var context = canvas.getContext('2d');
