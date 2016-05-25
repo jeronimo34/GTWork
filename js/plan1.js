@@ -51,41 +51,37 @@ negativeFilter = function(srcArray, dstArray, width, height){
         }
 }
 
+//return inside(1) or outside(-1)
+pointPolygonTest = function(binari){
+    //inside or outside
+    if(binari == 0){
+        return -1;
+    }
+    return 1;
+}
+
 //点と輪郭の関係を調べる
 //opencvのpointPolygonTestと同じ
 //contourImg 白い輪郭線と黒い背景のみの画像
 //binarizationImage ２値化した画像内部なら白くなっているはず
 //point 調べたいポイント
+//width 画像の横幅
+//height 画像の縦幅
 //戻り値 輪郭線と任意点との符号付の最短距離を返します。輪郭の内側の場合+ 輪郭の外側の場合-　同じなら０
-pointPolygonTest = function(contourImage, binArray, point){
-    var width = contourImage.width;
-    var height = contourImage.height;
+computeSignedDist = function(contourPosArray, binArray, point, width, height){
     
-    var contour = contourImage.data;
+    var contour = contourPosArray;
     var binari = binArray;
     
     var distance = Number.MAX_VALUE;//十分大きい数字
-    var signed = 1;
-    
-    //inside or outside
-    if(binari[point.x + point.y*width] == 0){
-        signed = -1;
-    }
-     
-    //最短距離
-    for(var i = 0; i < height; ++i)
-    {
-        for(var j = 0; j < width; ++j)
-        {
-            var idx = (i*width + j)*4;
-            //画素が黒であれば輪郭線上の画素でないためとばす
-            if(contour[idx] == 0)continue;
-            
-            var newDist = Math.sqrt((point.x - j) * (point.x - j) + (point.y - i) * (point.y - i));
-            distance = Math.min(newDist, distance);
-        }
-    }
-    
+    var signed = pointPolygonTest(binArray[point.y*width+point.x]);
+
+     //最短距離
+     for(var i = 0; i < contourPosArray.length; ++i){
+         var contourPos = contourPosArray[i];
+         var newDist = Math.sqrt((point.x - contourPos.x) *(point.x - contourPos.x) + (point.y - contourPos.y) *(point.y - contourPos.y));
+         distance = Math.min(newDist, distance);
+     }
     return signed * distance;
 }
 
@@ -138,11 +134,34 @@ Laplacian = function(binArray, dstImage)
     }
 }
 
+//
+//dstCoutourPosArray is Vector2 Array
+getContourPosArray = function(coutourImage, dstCoutourPosArray){
+    var width = coutourImage.width;
+    var height = coutourImage.height;
+    var src = coutourImage.data;
+    var dst = dstCoutourPosArray;
+    var idx = 0;
+    
+    for(var i = 0; i < height; ++i)
+    {
+        for(var j = 0; j < width; ++j)
+        {
+            var idx2 = (i*width + j) * 4;
+            
+            //エッジの上にある点
+            if(src[idx2] == 255){
+                dst[idx++] = new Vector2(j,i);
+            }
+        }
+    }
+    
+}
 
 //符号付距離が視覚的にわかる画像を生成する
-getSignedDistImage = function(solbeImage, binImage, dstImage){
-        var width = solbeImage.width;
-        var height = solbeImage.height;
+getSignedDistImage = function(coutourPosArray, binArray, dstImage){
+        var width = dstImage.width;
+        var height = dstImage.height;
     
         var dst = dstImage.data;
 
@@ -152,11 +171,11 @@ getSignedDistImage = function(solbeImage, binImage, dstImage){
     var distanceArray = []; // array of size width*height
     // TODO Float32 array or something like that
     // and pre-allocate size
-
+ 
     for(var i = 0; i < height; ++i){
         for(var j = 0; j < width; ++j){
             var point = new Vector2(j,i);
-            var distance = pointPolygonTest(solbeImage, binImage, point);
+            var distance = computeSignedDist(coutourPosArray, binArray, point,width,height);
             var idx = (j + i * width);
 	    distanceArray[idx] = distance;
 	    minDist = Math.min(distance, minDist);
@@ -171,7 +190,7 @@ getSignedDistImage = function(solbeImage, binImage, dstImage){
         for(var i = 0; i < height; ++i){
             for(var j = 0; j < width; ++j){
                 var point = new Vector2(j,i);
-                //var distance = pointPolygonTest(solbeImage, binImage, point);
+                //var distance = pointPolygonTest(laplacianImage, binImage, point);
                 var distance = distanceArray[j + i*width];
 
 		var idx = (j + i * width) * 4;
@@ -197,7 +216,6 @@ getSignedDistImage = function(solbeImage, binImage, dstImage){
 		    dst[idx + 3] = 255;
                 }
             }
-            console.log("i : " + i);
         }
 }
 
@@ -238,13 +256,18 @@ onload = function(){
         
         var binArray = [];
         var negativeArray = [];
+        var coutourPosArray = [];
         
         //filter
         binarizationFilter(srcImage, binArray, 1);
         negativeFilter(binArray, negativeArray, srcImage.width, srcImage.height);
         
         Laplacian(negativeArray, laplacianImage);
-        getSignedDistImage(laplacianImage, binArray, dstImage); 
+
+   
+        getContourPosArray(laplacianImage, coutourPosArray);
+
+        getSignedDistImage(coutourPosArray, binArray, dstImage); 
         
 	context.putImageData(laplacianImage, image.width, 0);
 	context.putImageData(dstImage, 2*image.width, 0);

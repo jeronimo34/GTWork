@@ -11,9 +11,10 @@ Vector2 = function(x,y){
    this.sub = function(v){return new Vector2(this.x - v.x, this.y - v.y);};
    this.mul = function(a){return new Vector2(this.x * a, this.y * a);};
    this.div = function(a){return new Vector2(this.x/a, this.y/a);};
-   this.distance = function(){
+   this.length = function(){
        return Math.sqrt(this.x * this.x + this.y * this.y);
    }
+   this.distance = function(v){return this.sub(v).length();}
    this.toString = function(){
        return "(" + this.x + "," + this.y + ")";
    }
