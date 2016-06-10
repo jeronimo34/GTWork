@@ -1,228 +1,44 @@
 
-//2値化フィルター
-//srcImage ImageData 元の画素データ(rgba)
-//dstImage ImageData 出力画像データ(rgba)
-//dstArray 0 -> black 255 -> white
-//thresh 閾値　この値を上回ると白くなる。
-binarizationFilter = function(srcImage, dstArray, thresh){
-    var width = srcImage.width;
-    var height = srcImage.height;
-    
-    var src = srcImage.data;
-    var dst = dstArray;
-    //2値化
-    //閾値　この値より大きければしろになる
-        for(var i = 0; i < height; ++i){
-            for(var j = 0; j < width; ++j){
-                
-                var idx = (j + i*width)*4;
-                var r = src[idx];
-                var g = src[idx+1];
-                var b = src[idx+2];
-                var a = src[idx+3];
-                
-                var gray = (r + g + b)/3;
-                var color = 0;
-                if(gray > thresh)color = 255;
-                
-                dst[i * width + j] = color;
-            }
-        }
+///////////////////////////////////////////////////////////
+//Marching cubes algorithmで使う値を返す
+//signedDist, z, zMaxは0.0 ~ 1.0
+///////////////////////////////////////////////////////////
+getExtrusionFunction = function(signedDist,z,zMax){
+    return Math.min(Math.min(signedDist, z), zMax-z);
 }
 
-//srcArray and dstArray have one component.
-//反転フィルター
-negativeFilter = function(srcArray, dstArray, width, height){
-    // var width = srcImage.width;
-    // var height = srcImage.height;
-    
-    var src = srcArray;
-    var dst = dstArray;
-    
-    //閾値　この値より大きければしろになる
-        for(var i = 0; i < height; ++i){
-            for(var j = 0; j < width; ++j){
-                
-                var idx = j + i*width;
-                var color = src[idx];
-                
-                dst[idx] = 255 - color;
-            }
-        }
-}
-
-//return inside(1) or outside(-1)
-pointPolygonTest = function(binari){
-    //inside or outside
-    if(binari == 0){
-        return -1;
-    }
-    return 1;
-}
-
-//点と輪郭の関係を調べる
-//opencvのpointPolygonTestと同じ
-//contourImg 白い輪郭線と黒い背景のみの画像
-//binarizationImage ２値化した画像内部なら白くなっているはず
-//point 調べたいポイント
-//width 画像の横幅
-//height 画像の縦幅
-//戻り値 輪郭線と任意点との符号付の最短距離を返します。輪郭の内側の場合+ 輪郭の外側の場合-　同じなら０
-computeSignedDist = function(contourPosArray, binArray, point, width, height){
-    
-    var contour = contourPosArray;
-    var binari = binArray;
-    
-    var distance = Number.MAX_VALUE;//十分大きい数字
-    var signed = pointPolygonTest(binArray[point.y*width+point.x]);
-
-     //最短距離
-     for(var i = 0; i < contourPosArray.length; ++i){
-         var contourPos = contourPosArray[i];
-         var newDist = Math.sqrt((point.x - contourPos.x) *(point.x - contourPos.x) + (point.y - contourPos.y) *(point.y - contourPos.y));
-         distance = Math.min(newDist, distance);
-     }
-    return signed * distance;
-}
-
-//エッジ検出
-//Laplacianオペレータ
-//4方向２次微分オペレータ
-//binArray have 1 component. 0 black 255 white
-Laplacian = function(binArray, dstImage)
-{
-    var width = dstImage.width;
-    var height = dstImage.height;
-    
-    var src = binArray;
-    var dst = dstImage.data;
-    
-    //上下左右の２次微分オペレータ
-   var weight = [
-        0,1,0,
-        1,-4,1,
-        0,1,0
-    ];
-    
-    for (var i = 0; i < height; i++) {
-        for (var j = 0; j < width; j++) {
-            var idx = (j + i * width) * 4;
-            var val = [0,0,0];
-        
-            //オペレータを積和演算している    
-            for(var k = -1; k <= 1; k++){
-                for(var l = -1; l <= 1 ; l++){
-                    var x = j + l;
-                    var y = i + k;
-                    if(x < 0 || x >= width || y < 0 || y >= height){
-                        continue;
-                    }
-                    var idx1 = x + y * width;
-                    var idx2 = (l + 1) + (k + 1)*3;
-                    
-                    val[0] += weight[idx2]*src[idx1];
-                    val[1] += weight[idx2]*src[idx1];
-                    val[2] += weight[idx2]*src[idx1];
-                }
-            }
-            
-            dst[idx] = val[0];
-            dst[idx + 1] = val[1];
-            dst[idx + 2] = val[2];
-            dst[idx + 3] = 255;
-        }
-    }
-}
-
-//
-//dstCoutourPosArray is Vector2 Array
-getContourPosArray = function(coutourImage, dstCoutourPosArray){
-    var width = coutourImage.width;
-    var height = coutourImage.height;
-    var src = coutourImage.data;
-    var dst = dstCoutourPosArray;
-    var idx = 0;
-    
-    for(var i = 0; i < height; ++i)
-    {
-        for(var j = 0; j < width; ++j)
+///////////////////////////////////////////////////////////
+//符号付距離画像からボリュームデータを得る。
+///////////////////////////////////////////////////////////
+getVolumeData = function(zMax, height, width, signedDistArray, volumeData){
+      //volume data
+        for(var z = 0; z < zMax; ++z)
         {
-            var idx2 = (i*width + j) * 4;
-            
-            //エッジの上にある点
-            if(src[idx2] == 255){
-                dst[idx++] = new Vector2(j,i);
-            }
-        }
-    }
-    
-}
-
-//符号付距離が視覚的にわかる画像を生成する
-getSignedDistImage = function(coutourPosArray, binArray, dstImage){
-        var width = dstImage.width;
-        var height = dstImage.height;
-    
-        var dst = dstImage.data;
-
-    // find min (<0) and max (>0) distance for rescaling
-    var minDist = Number.MAX_VALUE;
-    var maxDist = -Number.MAX_VALUE;
-    var distanceArray = []; // array of size width*height
-    // TODO Float32 array or something like that
-    // and pre-allocate size
- 
-    for(var i = 0; i < height; ++i){
-        for(var j = 0; j < width; ++j){
-            var point = new Vector2(j,i);
-            var distance = computeSignedDist(coutourPosArray, binArray, point,width,height);
-            var idx = (j + i * width);
-	    distanceArray[idx] = distance;
-	    minDist = Math.min(distance, minDist);
-	    maxDist = Math.max(distance, maxDist);
-	    
-        }
-    }
-        
-    
-    
-       //get signed distance image
-        for(var i = 0; i < height; ++i){
-            for(var j = 0; j < width; ++j){
-                var point = new Vector2(j,i);
-                //var distance = pointPolygonTest(laplacianImage, binImage, point);
-                var distance = distanceArray[j + i*width];
-
-		var idx = (j + i * width) * 4;
-                        
-                if(distance == 0){
-                    dst[idx] = 0;
-                    dst[idx+1] = 255; 
-                    dst[idx+2] = 0; 
-                    dst[idx + 3] = 255;
-                }
-                else if(distance > 0){
-                    //inside
-                    //dst[idx] = Math.max(distance*50, 255);
-                    dst[idx] = Math.floor(distance/maxDist * 255);
-		    dst[idx + 1] = dst[idx + 2] = 0;
-                    dst[idx + 3] = 255;
-                }
-                else {
-                    //outside
-                    dst[idx] = dst[idx + 1] = 0;
-                    //dst[idx + 2] = -Math.max(distance*50, 255);
-                    dst[idx + 2] = Math.floor(distance/minDist * 255);
-		    dst[idx + 3] = 255;
+            for(var y = 0; y < height; ++y)
+            {
+                for(var x = 0; x < width; ++x)
+                {
+                var idx = z * height * width + y * width + x;
+                var idx2 = y * width + x;
+                var zdiv = z/zMax;
+                
+                volumeData[idx] = getExtrusionFunction(signedDistArray[idx2], zdiv, 1.0);
                 }
             }
         }
 }
 
-
+///////////////////////////////////////////////////////////
 //ページがロードされた後に呼ばれる
+/////////////////////////////////////////////////////////////
 onload = function(){
-   
+    
+    var volumeData;
+    
+    var time = 0;
+    var clock = new THREE.Clock();
+    
+    
     if ( ! canvas || ! canvas.getContext ) {
     return false;
     }
@@ -230,6 +46,11 @@ onload = function(){
     var image = new Image();
     image.src = "./frontResizedPadded.png"
 
+    var width;
+    var height;
+    var zMax;
+    
+    
     //画像のロードに成功
     image.onload = function(e){
     //イメージを白黒画像にして出力
@@ -239,9 +60,10 @@ onload = function(){
         //キャンバスに画像をセット
         var canvas = document.getElementById('canvas');
         var context = canvas.getContext('2d');
-        
-        var width = image.width;
-        var height = image.height;
+            
+        width = image.width;
+        height = image.height;
+        zMax = image.width*0.9;
         
         //canvasと画像のサイズを同じにする     
         canvas.width = 3*image.width;
@@ -257,6 +79,8 @@ onload = function(){
         var binArray = [];
         var negativeArray = [];
         var coutourPosArray = [];
+        var signedDistArray = new Float32Array(width * height);//float32 array
+        var volumeData = new Float32Array(width * height * zMax);
         
         //filter
         binarizationFilter(srcImage, binArray, 1);
@@ -267,9 +91,190 @@ onload = function(){
    
         getContourPosArray(laplacianImage, coutourPosArray);
 
-        getSignedDistImage(coutourPosArray, binArray, dstImage); 
+        getSignedDistImage(coutourPosArray, binArray, dstImage, signedDistArray); 
         
-	context.putImageData(laplacianImage, image.width, 0);
-	context.putImageData(dstImage, 2*image.width, 0);
+        //signedDistArrayからボリュームデータを作成
+        getVolumeData(zMax, image.height, image.width, signedDistArray, volumeData);
+        
+	    context.putImageData(laplacianImage, image.width, 0);
+	    context.putImageData(dstImage, 2*image.width, 0);
+	    
+	    //
+	    //init three.js
+	    var MARGIN = 0;
+	    var SCREEN_WIDTH = window.innerWidth;
+	    var SCREEN_HEIGHT = window.innerHeight - 2 * MARGIN;
+	
+        var camera, scene, renderer, controls;
+        var light, pointLight, ambientLight;
+        var mesh, texture, geometry, materials, material, current_material;
+        var effect, resolution, numBlobs;
+        
+        //do function
+        init();
+        animate();
+        
+        ////////////////////////////////////////////////////////////
+        //initialize three.js
+        /////////////////////////////////////////////////////////
+        function init(){
+            
+            
+            //CAMERA
+            camera = new THREE.PerspectiveCamera(45, SCREEN_WIDTH/SCREEN_HEIGHT, 1, 10000);
+            camera.position.set(0, 0, 3000);
+            
+            
+            //SCENE
+            scene = new THREE.Scene();
+            
+            //LIGHT
+            light = new THREE.DirectionalLight(0xffffff);
+            light.position.set(0.5, 0.5, 1);
+            scene.add(light);
+            
+            pointLight = new THREE.PointLight( 0xff3300 );
+    		pointLight.position.set( 0, 0, 100 );
+    		scene.add( pointLight );
+    		ambientLight = new THREE.AmbientLight( 0x080808 );
+    		scene.add( ambientLight );
+            
+            //MATERIALS
+            materials = generateMaterials();
+            current_material = "colors";
+            
+            //MARCHING CUBES
+            resolution = 28;//立方体の1辺の長さ
+            resolution *= 2;
+             
+            numBlobs = 10;//metabolls num
+            
+            
+            effect = new THREE.MarchingCubes( resolution, materials[ current_material ].m, true, true );
+            effect.position.set(0,0,0);
+            effect.scale.set(700, 700, 700);
+            
+            effect.enableUvs = false;
+            effect.enableColors = false;
+            
+            scene.add(effect);
+            
+            //RENDERER
+            
+            renderer = new THREE.WebGLRenderer();
+        	renderer.setClearColor(0x4f8080);
+        	renderer.setPixelRatio(window.devicePixelRatio);
+        	renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
+        	document.body.appendChild( renderer.domElement );
+        
+            //CONTROLS
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+        }
+    
+        ////////////////////////////////////////////////////////////////////////
+        //アニメーション　コールバックされる。
+        /////////////////////////////////////////////////////////////////////////
+        function animate(){
+            requestAnimationFrame(animate);
+            render();
+            //stats.update()
+        }
+        
+        /////////////////////////////////////////////////////////////////////////
+        //描画処理
+        /////////////////////////////////////////////////////////////////////////
+        function render(){
+            var delta = clock.getDelta();
+            time += delta;
+            
+            //marching cube
+            updateCubes(effect, time, 10, false, false, false);
+            
+            //lights
+            
+            //light.position.set( effectController.lx, effectController.ly, effectController.lz );
+    		//light.position.normalize();
+    		//pointLight.color.setHSL( effectController.lhue, effectController.lsaturation, effectController.llightness );
+            
+            // render
+            renderer.clear();
+            renderer.render(scene, camera);
+        }
+        
+        ///////////////////////////////////////////////////////////////////////
+        //マテリアルの生成
+        ///////////////////////////////////////////////////////////////////////////
+        function generateMaterials(){
+            
+            var materials = {
+                "shiny" :
+                {
+                    m: new THREE.MeshStandardMaterial({color: 0x550000, metalness: 1.0 }),
+                    h: 0, s: 0.8, l: 0.2
+                },
+                "colors" :
+    			{
+    				m: new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0xffffff, shininess: 2, vertexColors: THREE.VertexColors } ),
+    				h: 0, s: 0, l: 1
+    			},
+            };
+            
+            return materials;
+        }
+        
+        ///////////////////////////////////////////////////////////////////////
+        //this controls content of marching cubes voxel field
+        ///////////////////////////////////////////////////////////////////////
+        function updateCubes(object, time, numblobs, floor, wallx, wallz)
+        {
+            object.reset();
+            
+            //fill the field with some metaballs
+            var i, ballx, bally, ballz, subtract, strength;
+            
+            subtract = 24;
+            strength = 1.2 / ((Math.sqrt(numblobs)-1)/4 + 1);
+            
+            //add balls
+    //         for(i = 0; i < numblobs; ++i){
+    //             ballx = Math.sin( i + 1.26 * time * ( 1.03 + 0.5 * Math.cos( 0.21 * i ) ) ) * 0.27 + 0.5;
+    // 			bally = Math.abs( Math.cos( i + 1.12 * time * Math.cos( 1.22 + 0.1424 * i ) ) ) * 0.77; // dip into the floor
+    // 			ballz = Math.cos( i + 1.32 * time * 0.1 * Math.sin( ( 0.92 + 0.53 * i ) ) ) * 0.27 + 0.5;
+    // 			object.addBall(ballx, bally, ballz, strength, subtract);
+    //         }
+            
+            //ボリュームデータからマーチングキューブ法を用いてモデルを生成
+             object.addExtrusionObject(
+             volumeData,
+             image.width, 
+             image.height, 
+             zMax,
+             2,
+             12);
+            
+            
+            if( floor ) object.addPlaneY(2, 12);
+            if( wallz ) object.addPlaneZ(2, 12);
+            if( wallx ) object.addPlaneX(2, 12);
+        }
+        
+        
+        ///////////////////////////////////////////////////////////////////////
+        //test volumeData
+        ///////////////////////////////////////////////////////////////////////
+        function generateVolumeData(sizeX, sizeY, sizeZ){
+            var x, y, z;
+            var volumeData = new Float32Array(sizeX * sizeY * sizeZ);
+            
+            for(x = 0; x < sizeX; ++x){
+                for(y = 0; y < sizeY; ++y){
+                     for(z = 0; z < sizeZ; ++z){
+                        var idx = z*sizeX*sizeY + y*sizeX + x;
+                        volumeData[idx] = Math.min(Math.min((x/sizeX), (z/sizeZ)), (y/sizeY));
+                    }
+                }
+            }
+            return volumeData;
+        }
     };
 }
