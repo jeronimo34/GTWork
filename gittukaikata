@@ -1,0 +1,17 @@
+git 使い方メモ
+
+
+git init
+git add .
+git commit -m "first commit"
+git remote add origin master "http://~~.git" <- うろ覚え
+git push origin master <- うろ覚え
+
+更新処理
+git add --update
+git commit -m "comment"
+git push 
+
+もしgitpushでエラーが出たらリモートのリポジトリと同期する
+git pull
+git push
