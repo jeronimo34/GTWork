@@ -5,10 +5,11 @@
  * http://webglsamples.googlecode.com/hg/blob/blob.html
  */
 
-THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ) {
+THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors , ccw) {
 
 	THREE.ImmediateRenderObject.call( this, material );
 
+	this.ccw = ccw !== undefined ? ccw : false;
 	this.enableUvs = enableUvs !== undefined ? enableUvs : false;
 	this.enableColors = enableColors !== undefined ? enableColors : false;
 
@@ -324,11 +325,18 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors )
 	this.posnormtriv = function( pos, norm, o1, o2, o3, renderCallback ) {
 
 		var c = this.count * 3;
-
+		
+		if(this.ccw){
+		//CWからCCWへ
+		var tmp = o2;
+		o2 = o1;
+		o1 = tmp;
+		}
+		
 		// positions
 
-		this.positionArray[ c ] 	= pos[ o1 ];
-		this.positionArray[ c + 1 ] = pos[ o1 + 1 ];
+		this.positionArray[ c ] 	= pos[ o1 ];//x
+		this.positionArray[ c + 1 ] = pos[ o1 + 1 ];//y
 		this.positionArray[ c + 2 ] = pos[ o1 + 2 ];
 
 		this.positionArray[ c + 3 ] = pos[ o2 ];
@@ -339,7 +347,6 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors )
 		this.positionArray[ c + 7 ] = pos[ o3 + 1 ];
 		this.positionArray[ c + 8 ] = pos[ o3 + 2 ];
 
-		// normals
 
 		this.normalArray[ c ] 	  = norm[ o1 ];
 		this.normalArray[ c + 1 ] = norm[ o1 + 1 ];
@@ -358,15 +365,17 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors )
 		if ( this.enableUvs ) {
 
 			var d = this.count * 2;
+			
+			var bairitu = 0.5;
+			//uvを0 ~ 1の範囲に直している?
+			this.uvArray[ d ] 	  = 1.0 - Math.abs(pos[ o1 ] * bairitu - 0.5);
+			this.uvArray[ d + 1 ] = 1.0 - Math.abs(pos[ o1 + 1 ] * bairitu - 0.5);
 
-			this.uvArray[ d ] 	  = pos[ o1 ];
-			this.uvArray[ d + 1 ] = pos[ o1 + 2 ];
+			this.uvArray[ d + 2 ] = 1.0 - Math.abs(pos[ o2 ] * bairitu - 0.5);
+			this.uvArray[ d + 3 ] = 1.0 - Math.abs(pos[ o2 + 1 ] * bairitu - 0.5);
 
-			this.uvArray[ d + 2 ] = pos[ o2 ];
-			this.uvArray[ d + 3 ] = pos[ o2 + 2 ];
-
-			this.uvArray[ d + 4 ] = pos[ o3 ];
-			this.uvArray[ d + 5 ] = pos[ o3 + 2 ];
+			this.uvArray[ d + 4 ] = 1.0 - Math.abs(pos[ o3 ] * bairitu - 0.5);
+			this.uvArray[ d + 5 ] = 1.0 - Math.abs(pos[ o3 + 1 ] * bairitu - 0.5);
 
 		}
 
@@ -533,7 +542,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors )
 			var max_x = this.size-1;
 			var min_y = 1;
 			var max_y = this.size-1;
-			var min_z = 2;
+			var min_z = 1;
 			var max_z = this.size-2;
 
 		if ( dist > size ) dist = size;
@@ -557,9 +566,9 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors )
 						//?
 						val = strength / (0.0001 + voldata) - subtract;
 						
-						if(val > 0)
-						field[ zd * z + cxy ] += val;
-
+						// if(val > 0)
+						// field[ zd * z + cxy ] = val;
+						field[ zd * z + cxy ] = -voldata;
 					}
 				}
 		}
@@ -726,7 +735,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors )
 					var fx = ( x - this.halfsize ) / this.halfsize; //+ 1
 					var q = y_offset + x;
 
-					this.polygonize( fx, fy, fz, q, this.isolation, renderCallback );
+					this.polygonize( fx, fy, fz, q, 0.0/*this.isolation*/, renderCallback );
 
 				}
 
@@ -750,7 +759,6 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors )
 
 
 			for ( i = 0; i < object.count; i ++ ) {
-
 				a = i * 3;
 				b = a + 1;
 				c = a + 2;
