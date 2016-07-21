@@ -6,9 +6,9 @@ binalize<br>
 negative<br>
 Extract contours<br>
 Compute the signed distance<br>
+add color<br>
 
 *TO DO<br>
-Extrude the 2d signed distance<br>
 Plan2
 Plan3
 ~~~<br>

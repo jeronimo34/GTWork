@@ -527,7 +527,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 	//Adds a model that defined by volume data.
 	////////////////////////////////////////////////
 	this.addExtrusionObject = function(volumeData, 
-	                                   sizeX, sizeY, sizeZ, strength, subtract){
+	                                   sizeX, sizeY, sizeZ){
 	                                   	
 			var x, y, z, xx, val, xdiv, cxy,ydiv, zdiv, voldata, idx,
 
@@ -536,16 +536,14 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 			yd = this.yd,
 			zd = this.zd,
 			field = this.field,
-			dist = size * Math.sqrt( strength / subtract );
+			dist = size;
 	
-			var min_x = 1;
-			var max_x = this.size-1;
-			var min_y = 1;
-			var max_y = this.size-1;
-			var min_z = 1;
-			var max_z = this.size-2;
-
-		if ( dist > size ) dist = size;
+			var min_x = 0;
+			var max_x = this.size;
+			var min_y = 0;
+			var max_y = this.size;
+			var min_z = 0;
+			var max_z = this.size;
 
 		for ( x = min_x; x < max_x; x ++ ) {
 			xdiv = (x-min_x) / (max_x-min_x);
@@ -563,11 +561,6 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 						
 						voldata = volumeData[idx];
 						
-						//?
-						val = strength / (0.0001 + voldata) - subtract;
-						
-						// if(val > 0)
-						// field[ zd * z + cxy ] = val;
 						field[ zd * z + cxy ] = -voldata;
 					}
 				}

@@ -1,10 +1,61 @@
 <html>
 	<head>
+		
 		<title>GT Work</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scaleable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body{
+				font-family: Monospace;
+				background-color: #000000;
+				margin: 0px;
+				overflow: hidden;
+			}	
+			
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display: block;
+			}
+			
+			div.floating {
+				color : #ffffff;
+				background : #000000;
+				opacity : 0.8;
+				width :  80%;
+				height : 80%;
+				position : absolute;
+				left : 10%;
+				top : 10%;
+				border : 1px solid #555555;
+				padding : 10px;
+				display : none;
+				overflow : auto;
+				z-index : 100;
+			}
+			
+			span.link {
+				color: skyblue;
+				cursor: pointer;
+				text-decoration : underline;
+			}
+			
+			a{
+				color: skyblue;
+			}
+			
+		</style>
+		
+		<script src="https://code.jquery.com/jquery-3.0.0.min.js"></script>
 		<script src="js/three.min.js"></script>
 		<script src="js/MarchingCubes.js"></script>
 		<script src="js/OrbitControls.js"></script>
 		<script src="js/libs/dat.gui.min.js"></script>
+		<script src="js/exporters/OBJExporter.js"></script>
 
 		<!--
 		<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -16,10 +67,28 @@
 		<!-- 
 		<script src="js/marchingCubes_test.js"></script>
 		-->
+		<!--
 		<script src="js/plan1.js"></script>
+		-->
+		<script src="js/plan2.js"></script>
 	</head>
 		
 	<body>
+		<div id="info">
+			<a href="http://threejs.org" target="_blank">three.js</a>
+			- geometries:
+			<!--<span class="link" id="triangle">triangle</span>,-->
+			<!--<span class="link" id="cube">cube</span>,-->
+			<!--<span class="link" id="cylinder">cylinder</span>,-->
+			<!--<span class="link" id="both">both</span>,-->
+			<!--<span class="link" id="transformed">transformed</span>-->
+			- <span class="link" id="export">export to obj</span>
+		</div>
+		
 		<canvas id = "canvas" width = "140" height = "140"></canvas>
+		<!--<form name="デリート">-->
+			
+		<!--	<input type="button" value="delete" onClick="deleteVolData()"></input>-->
+		<!--</form>-->
 	</body>
 </html>
