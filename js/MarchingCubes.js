@@ -728,7 +728,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 					var fx = ( x - this.halfsize ) / this.halfsize; //+ 1
 					var q = y_offset + x;
 
-					this.polygonize( fx, fy, fz, q, 0.0/*this.isolation*/, renderCallback );
+					this.polygonize( fx, fy, fz, q, 0/*this.isolation*/, renderCallback );
 
 				}
 
