@@ -1,16 +1,5 @@
-I have written GTWork code on js/imageLoad.js.
+GTWork main code is js/plan3.js. <br>
 
-*finished<br>
-Load image<br>
-binalize<br>
-negative<br>
-Extract contours<br>
-Compute the signed distance<br>
-add color<br>
+TO DO<br>
+add color from textures.<br>
 
-*TO DO<br>
-Plan2
-Plan3
-~~~<br>
-
-add
