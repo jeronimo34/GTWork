@@ -8,7 +8,7 @@ git remote add origin master "http://~~.git" <- うろ覚え
 git push origin master <- うろ覚え
 
 更新処理
-git add --update
+git add --update または git add .
 git commit -m "comment"
 git push 
 

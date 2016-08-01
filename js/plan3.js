@@ -47,7 +47,7 @@ onload = function(){
     
     //export obj data
     var exportButton, floatingDiv;
-    var max_resolution = 100;
+    var max_resolution = 80;
     
     var time = 0;
     var clock = new THREE.Clock();
@@ -210,7 +210,7 @@ onload = function(){
         
         //STATS
         stats = new Stats();
-        container.appendChild(stats.dom);
+        //container.appendChild(stats.dom);
         
         // COMPOSER
         renderer.autoClear = false;
@@ -578,6 +578,7 @@ onload = function(){
 		var h, m_h, m_s, m_l;
 		
 		var gui = new dat.GUI();
+		gui.addFolder("dummy");
 		
 		// material (type)
 		h = gui.addFolder( "Materials" );
@@ -604,7 +605,7 @@ onload = function(){
 		h = gui.addFolder( "Simulation" );
 		//h.add( effectController, "speed", 0.1, 8.0, 0.05 );
 		//h.add( effectController, "numBlobs", 1, 50, 1 );
-		h.add( effectController, "resolution", 14, 100, 1 );
+		h.add( effectController, "resolution", 14, max_resolution, 1 );
 		//h.add( effectController, "isolation", 10, 300, 1 );
 		//h.add( effectController, "floor" );
 		//h.add( effectController, "wallx" );
