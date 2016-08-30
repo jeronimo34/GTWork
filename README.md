@@ -1,4 +1,4 @@
-Main code: gt_work01/gtwork.js, gtwork.html.<br>
+Main code: gtwork.js, gtwork.html.<br>
 
 *TO DO<br>
 different methods than the Marching Cubes for the polygonization of the field,<br>
