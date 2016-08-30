@@ -1,0 +1,148 @@
+<html>
+    
+  <meta charset="UTF-8">
+  
+  <head>
+      <style>
+          td { position: relative; }
+          span { position:absolute; color:#ffffff; top: 0px; left: 0px; width: 150px; }
+      </style>
+      
+  </head>
+  <body>
+    
+    <button type="button" onClick="hideSetting();">
+        Create Model
+    </button>
+    
+    <div id="setting">
+        
+    <br/>
+    
+    <!-- model1 -->
+    <div id="model1">
+        <font size="28" face="MSゴシック">Model1</font>
+        <li>FrontImage<input type="file" id="front"></input></li>
+        <li>BackImage<input type="file" id="back"></input></li>
+        <li>LeftImage<input type="file" id="left"></input></li>
+        <li>RightImage<input type="file" id="right"></input></li>
+        <li>TopImage<input type="file" id="top"></input></li>
+        <li>BottomImage<input type="file" id="bottom"></input></li>
+        
+        <div id="Image">
+            <table border="1" width="350" height="350" valign="middle">
+                <tr>
+                    <td></td>
+                    <td><img id="top" src="../top.png" width="150" height="150"><span>top</span></img></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td><img id="front" src="../front.png" width="150" height="150"><span>front</span></img></td>
+                    <td><img id="left" src="../left.png" width="150" height="150"><span>left</span></img></td>
+                    <td><img id="back" src="../back.png" width="150" height="150"><span>back</span></img></td>
+                    <td><img id="right" src="../right.png" width="150" height="150"><span>right</span></img></td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td><img id="bottom" src="../bottom.png" width="150" height="150"><span>bottom</span></img></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    
+    <br/>
+    
+    <!--model2-->
+    <div id="model2">
+        <font size="28" face="MSゴシック">Model2</font>
+        <li>FrontImage<input type="file" id="front"></input></li>
+        <li>BackImage<input type="file" id="back"></input></li>
+        <li>LeftImage<input type="file" id="left"></input></li>
+        <li>RightImage<input type="file" id="right"></input></li>
+        <li>TopImage<input type="file" id="top"></input></li>
+        <li>BottomImage<input type="file" id="bottom"></input></li>
+        
+        <div id="Image">
+            <table border="1" width="350" height="350" valign="middle">
+                <tr>
+                    <td></td>
+                    <td><img id="top" src="../top.png" width="150" height="150"><span>top</span></img></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td><img id="front" src="../front.png" width="150" height="150"><span>front</span></td>
+                    <td><img id="left" src="../left.png" width="150" height="150"><span>left</span></td>
+                    <td><img id="back" src="../back.png" width="150" height="150"><span>back</span></td>
+                    <td><img id="right" src="../right.png" width="150" height="150"><span>right</span></td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td><img id="bottom" src="../bottom.png" width="150" height="150"><span>bottom</span></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    </div>
+    
+    <script type="text/javascript">
+    
+    hideSetting = function()
+    {
+        var element = document.getElementById("setting");
+        
+        if(element.style.display == "block"){
+            element.style.display = "none";
+        }
+        else{
+            element.style.display = "block";    
+        }
+    }
+    
+    buttonNum = 0;
+    
+    createDiv = function(){
+    	var div0 = document.createElement( "div" );
+        var text = document.createTextNode("hogehoge");
+        var text2 = document.createTextNode("hogehoge2");
+        
+        var span0 = document.createElement("span");
+        var button = document.createElement("button");
+        
+        button.innerHTML = "push me!";
+        button.setAttribute('name', 'button' + buttonNum);
+        button.setAttribute('onClick', 'showButtonInfo(this)');
+        
+        
+        span0.innerHTML = "span";
+        span0.style = "font-size:24px; color:#FF0000";
+        
+        div0.appendChild(button);
+        div0.appendChild(text);
+        div0.appendChild( span0 );
+        div0.appendChild(text2);
+        return div0;
+	}
+    //divエレメントを生成
+    
+    addElement = function(){
+        buttonNum++;
+        var div0 = createDiv();
+        document.body.appendChild(div0);
+    }
+	
+	showButtonInfo = function(button)
+	{
+	    console.log("hoge" + button.name);
+	}
+	
+    </script>
+
+  </body>
+</html>

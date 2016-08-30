@@ -1,20 +1,33 @@
 <html>
-	<head>
-		
-		<title>GT Work</title>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, user-scaleable=no, minimum-scale=1.0, maximum-scale=1.0">
-		<style>
-			body{
-				color : #fff;
-				font-family: Monospace;
+    
+  <meta charset="UTF-8">
+  
+  <head>
+      <style>
+          td { position: relative; }
+          
+          span.imageTable { position:absolute; color:#00ffff; top: 0px; left: 0px; width: 150px; }
+          
+   /*       body{*/
+			/*	color : #fff;*/
+			/*	font-family: Monospace;*/
 			
-				background-color: #000000;
-				margin: 0px;
-				overflow: hidden;
-			}	
+			/*	background-color: #000000;*/
+			/*	margin: 0px;*/
+			/*	overflow: hidden;*/
+			/*}	*/
 			
 			#info {
+				color: #fff;
+				position: absolute;
+				top: 0px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				padding: 5px;
+			}
+			
+			#returnSetting {
 				color: #fff;
 				position: absolute;
 				top: 0px;
@@ -49,10 +62,9 @@
 			a{
 				color: skyblue;
 			}
-			
-		</style>
-		
-		<script src="https://code.jquery.com/jquery-3.0.0.min.js"></script>
+      </style>
+      
+      <script src="https://code.jquery.com/jquery-3.0.0.min.js"></script>
 		<script src="js/three.min.js"></script>
 		<script src="js/MarchingCubes.js"></script>
 		<script src="js/OrbitControls.js"></script>
@@ -82,17 +94,220 @@
 		<script src="js/minMatrix.js"></script>
 		<script src="js/mymath.js"></script>
 		<script src="js/imageProcess.js"></script>
-		<script src="js/plan3.js"></script>
-	</head>
 		
-	<body>
-		<div id="container"></div>
-		<div id="info">
-			<a href="http://threejs.org" target="_blank">three.js</a>
-			- geometries:
-			- <span class="link" id="export">export to obj</span>
-		</div>
+		<!--main code-->
+		<script src="gtwork.js"></script>
+  </head>
+  
+  <body>
+    
+	<!--three.js space	-->
+    <div id="container" style="display:none;">
+        <!--info-->
+        <div id="info">
+    		<a href="http://threejs.org" target="_blank">three.js</a>
+    		- geometries:
+    		- <span class="link" id="export">export to obj</span>
+    		<!--- <button onclick="gotoSetting();"> goto setting </button>-->
+    	</div>
+        
+        <canvas id = "canvas" width = "0" height = "0"></canvas>
+    </div>
 		
-		<canvas id = "canvas" width = "0" height = "0"></canvas>
-	</body>
+	
+    <!--image setting-->
+    <div id="setting">
+    
+        <button type="button" onClick="createModel();" id="createButton" disabled >
+            Create Model
+        </button>
+            
+        <br/>
+        
+        <!-- model1 -->
+        <div id="model1">
+            <font size="28" face="MSゴシック">Model1</font>
+            <li>FrontImage<input type="file" class="front_btn"></input></li>
+            <li>BackImage<input type="file" class="back_btn"></input></li>
+            <li>LeftImage<input type="file" class="left_btn"></input></li>
+            <li>RightImage<input type="file" class="right_btn"></input></li>
+            <li>TopImage<input type="file" class="top_btn"></input></li>
+            <li>BottomImage<input type="file" class="bottom_btn"></input></li>
+            
+            <div class="Image">
+                <table border="1" width="350" height="350" valign="middle">
+                    <tr>
+                        <td></td>
+                        <td><img class="top" src="top.png" ><span class="imageTable">top</span></img></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td><img class="front" src="front.png" ><span class="imageTable">front</span></img></td>
+                        <td><img class="left" src="left.png" ><span class="imageTable">left</span></img></td>
+                        <td><img class="back" src="back.png" ><span class="imageTable">back</span></img></td>
+                        <td><img class="right" src="right.png" ><span class="imageTable">right</span></img></td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td><img class="bottom" src="bottom.png" ><span class="imageTable">bottom</span></img></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <br/>
+        
+        <!--model2-->
+        <div id="model2">
+            <font size="28" face="MSゴシック">Model2</font>
+            <li>FrontImage<input type="file" class="front_btn"></input></li>
+            <li>BackImage<input type="file" class="back_btn"></input></li>
+            <li>LeftImage<input type="file" class="left_btn"></input></li>
+            <li>RightImage<input type="file" class="right_btn"></input></li>
+            <li>TopImage<input type="file" class="top_btn"></input></li>
+            <li>BottomImage<input type="file" class="bottom_btn"></input></li>
+            
+            <div class="Image">
+                <table border="1" width="350" height="350" valign="middle">
+                    <tr>
+                        <td></td>
+                        <td><img class="top" src="textures/top2.png" ><span class="imageTable">top</span></img></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td><img class="front" src="textures/front2.png" ><span class="imageTable">front</span></td>
+                        <td><img class="left" src="textures/left2.png" ><span class="imageTable">left</span></td>
+                        <td><img class="back" src="textures/back2.png" ><span class="imageTable">back</span></td>
+                        <td><img class="right" src="textures/right2.png" ><span class="imageTable">right</span></td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td><img class="bottom" src="textures/bottom2.png" ><span class="imageTable">bottom</span></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    
+    <script type="text/javascript">
+    
+    //リソースが全て読み込まれた <- 要検証？
+    window.onload = function(){
+        var images1, images2;
+        
+        
+        //モデルの作成に使用する画像配列の初期化
+	    initLoadImage = function()
+        {
+            //cretebuttonを押せる状態にする
+            document.getElementById("createButton").disabled = false;
+            
+            var imageNum = 6;//front, back, left, right, top, bottom
+            images1 = new Array(imageNum);
+            images2 = new Array(imageNum);
+            
+            var model1Elem = document.getElementById("model1");
+            var model2Elem = document.getElementById("model2");
+            
+            var imgTable = model1Elem.getElementsByClassName("Image")[0];
+            var imgClassNames = new Array("front","back","left","right","top","bottom");
+            var buttonClassNames = new Array("front_btn","back_btn","left_btn","right_btn","top_btn","bottom_btn");
+            
+            //init model1
+            //init images1
+            for(var i = 0; i < imgClassNames.length; ++i)
+            {
+                var img = imgTable.getElementsByClassName(imgClassNames[i])[0];
+                images1[i] = img;
+            }
+            
+            //init model1 button
+            for(var i = 0; i < buttonClassNames.length; ++i)
+            {
+                var btn = model1Elem.getElementsByClassName(buttonClassNames[i])[0];
+                
+                btn.addEventListener( "change", function() {
+                    
+        	        //urlをimageelement.srcに代入？
+                	var fileList = this.files;
+                    
+                	//画像更新
+                	for( var i=0; i<1; i++ ) {
+                		// Blob URLの作成
+                		var blobUrl = window.URL.createObjectURL( fileList[i] ) ;
+                        var str = this.className;
+                        //front_btn -> frontにしている
+                        str = str.substr(0, str.lastIndexOf("_btn"));
+                	    var img = document.getElementById( "model1" ).getElementsByClassName( str )[0];
+                        //画像更新
+                        img.src = blobUrl;
+                	}
+        	    } ) ;
+            }
+            
+            //init model2
+            //init images2
+            imgTable = model2Elem.getElementsByClassName("Image")[0];
+            for(var i = 0; i < imgClassNames.length; ++i)
+            {
+                var img = imgTable.getElementsByClassName(imgClassNames[i])[0];
+                images2[i] = img;
+            }
+            //init model2 button
+            for(var i = 0; i < buttonClassNames.length; ++i)
+            {
+                var btn = model2Elem.getElementsByClassName(buttonClassNames[i])[0];
+                
+                btn.addEventListener( "change", function() {
+        	        //urlをimageelement.srcに代入？
+                	var fileList = this.files;
+                	
+                	//画像更新
+                	for( var i=0; i<1; i++ ) {
+                		// Blob URLの作成
+                		var blobUrl = window.URL.createObjectURL( fileList[i] ) ;
+                        var str = this.className;
+                        //front_btn -> frontにしている
+                        str = str.substr(0, str.lastIndexOf("_btn"));
+                	    var img = document.getElementById( "model2" ).getElementsByClassName( str )[0];
+                        //画像更新
+                        img.src = blobUrl;
+                	}
+        	    } ) ;
+            }
+        }
+        
+        //push create model button
+        createModel = function(){
+            //gtwork.js
+            initThreeJs(images1, images2);
+            
+            //画像設定画面を非表示にする
+            var elem = document.getElementById("setting");
+            elem.style.display = "none";
+            
+            document.getElementById("container").style.display = "block";
+        }
+    
+        //goto setting button
+        gotoSetting = function()
+        {
+            //gtwork.js
+            document.getElementById( "setting" ).style.display = "block";
+            document.getElementById( "container" ).style.display = "none";
+        }
+        
+        //モデルの作成に使用する画像配列の初期化
+	    initLoadImage();
+    }
+	</script>
+
+  </body>
 </html>

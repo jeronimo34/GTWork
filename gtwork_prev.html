@@ -1,0 +1,98 @@
+<html>
+	<head>
+		
+		<title>GT Work</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scaleable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body{
+				color : #fff;
+				font-family: Monospace;
+			
+				background-color: #000000;
+				margin: 0px;
+				overflow: hidden;
+			}	
+			
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 0px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				padding: 5px;
+			}
+			
+			div.floating {
+				color : #ffffff;
+				background : #000000;
+				opacity : 0.8;
+				width :  80%;
+				height : 80%;
+				position : absolute;
+				left : 10%;
+				top : 10%;
+				border : 1px solid #555555;
+				padding : 10px;
+				display : none;
+				overflow : auto;
+				z-index : 100;
+			}
+			
+			span.link {
+				color: skyblue;
+				cursor: pointer;
+				text-decoration : underline;
+			}
+			
+			a{
+				color: skyblue;
+			}
+			
+		</style>
+		
+		<script src="https://code.jquery.com/jquery-3.0.0.min.js"></script>
+		<script src="js/three.min.js"></script>
+		<script src="js/MarchingCubes.js"></script>
+		<script src="js/OrbitControls.js"></script>
+		
+		<script src="js/exporters/OBJExporter.js"></script>
+	
+		<script src="js/shaders/CopyShader.js"></script>
+		<script src="js/shaders/FXAAShader.js"></script>
+		<script src="js/shaders/HorizontalTiltShiftShader.js"></script>
+		<script src="js/shaders/VerticalTiltShiftShader.js"></script>
+		
+		<script src="js/postprocessing/EffectComposer.js"></script>
+		<script src="js/postprocessing/RenderPass.js"></script>
+		<script src="js/postprocessing/BloomPass.js"></script>
+		<script src="js/postprocessing/ShaderPass.js"></script>
+		<script src="js/postprocessing/MaskPass.js"></script>
+		<script src="js/postprocessing/SavePass.js"></script>
+		
+		<script src="js/Detector.js"></script>
+		<script src="js/libs/stats.min.js"></script>
+		<script src="js/libs/dat.gui.min.js"></script>
+		
+		<!--
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+		<script src="js/test_three.js"></script>
+		-->
+		<script src="js/minMatrix.js"></script>
+		<script src="js/mymath.js"></script>
+		<script src="js/imageProcess.js"></script>
+		<script src="js/plan3.js"></script>
+	</head>
+		
+	<body>
+		<div id="container"></div>
+		<div id="info">
+			<a href="http://threejs.org" target="_blank">three.js</a>
+			- geometries:
+			- <span class="link" id="export">export to obj</span>
+		</div>
+		
+		<canvas id = "canvas" width = "0" height = "0"></canvas>
+	</body>
+</html>

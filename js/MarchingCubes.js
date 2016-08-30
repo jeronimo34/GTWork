@@ -365,6 +365,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 		if ( this.enableUvs ) {
 
 			var d = this.count * 2;
+			//Spherical Mapping with Normals
 			
 			var bairitu = 0.5;
 			//uvを0 ~ 1の範囲に直している?
@@ -372,7 +373,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 			this.uvArray[ d + 1 ] = 1.0 - Math.abs(pos[ o1 + 1 ] * bairitu - 0.5);
 
 			this.uvArray[ d + 2 ] = 1.0 - Math.abs(pos[ o2 ] * bairitu - 0.5);
-			this.uvArray[ d + 3 ] = 1.0 - Math.abs(pos[ o2 + 1 ] * bairitu - 0.5);
+			this.uvArray[ d + 3 ] =  1.0 - Math.abs(pos[ o2 + 1 ] * bairitu - 0.5);
 
 			this.uvArray[ d + 4 ] = 1.0 - Math.abs(pos[ o3 ] * bairitu - 0.5);
 			this.uvArray[ d + 5 ] = 1.0 - Math.abs(pos[ o3 + 1 ] * bairitu - 0.5);

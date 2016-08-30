@@ -1,16 +1,11 @@
-I have written GTWork code on js/imageLoad.js.
-
-*finished<br>
-Load image<br>
-binalize<br>
-negative<br>
-Extract contours<br>
-Compute the signed distance<br>
-add color<br>
+Main code: gtwork.js, gtwork.html.<br>
 
 *TO DO<br>
-Plan2
-Plan3
-~~~<br>
+different methods than the Marching Cubes for the polygonization of the field,<br>
+try different sort of interpolation methods instead of linear interpolation,<br>
+texture mapping<br>
+
+*DONE<br>
+load different models and morph between them,<br>
 
 add

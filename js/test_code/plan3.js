@@ -87,9 +87,9 @@ onload = function(){
     }
     
     //volumeDataの作成
-    fbvolData = createVolumeDataFrom2ImgData(imagesData[0], imagesData[1]);//front, back
-    rlvolData = createVolumeDataFrom2ImgData(imagesData[2], imagesData[3]);//right, left
-    tbvolData = createVolumeDataFrom2ImgData(imagesData[4], imagesData[5]);//top bottom
+    fbvolData = createVolumeDataFrom2ImgData(imagesData[0], imagesData[1],0);//front, back
+    rlvolData = createVolumeDataFrom2ImgData(imagesData[2], imagesData[3],1);//right, left
+    tbvolData = createVolumeDataFrom2ImgData(imagesData[4], imagesData[5],2);//top bottom
     volumeData = new Float32Array(volDataX * volDataY * volDataZ);
     
     //三つの密度データを合わせた密度データを生成する
@@ -97,11 +97,7 @@ onload = function(){
         for(var y = 0; y <  volDataY; ++y){
             for(var z = 0; z < volDataZ; ++z){
                 var idx0 = x + y*volDataX + z*volDataX*volDataY;
-                var idx1 = y + (volDataZ - z)*volDataX + x*volDataX*volDataY;
-                var idx2 = volDataZ-z + x*volDataX + (volDataY-y)*volDataX*volDataY;
-                //volumeData[idx0] = fbvolData[idx0];
-                //volumeData[idx0] = Math.min(fbvolData[idx0], rlvolData[idx1]);
-                volumeData[idx0] = Math.min(fbvolData[idx0], Math.min(rlvolData[idx1], tbvolData[idx2]));
+                volumeData[idx0] = Math.min(fbvolData[idx0], Math.min(rlvolData[idx0], tbvolData[idx0]));
             }
         }
     }
@@ -109,7 +105,7 @@ onload = function(){
     //initialize three.js
     init();
     
-    //redering scene
+    //render scene
     animate();
     
     //////////////////////////////////////////////////////////////
@@ -386,7 +382,7 @@ onload = function(){
     //マテリアルの生成
     ///////////////////////////////////////////////////////////////////////////
     function generateMaterials(){
-        var texture = new THREE.TextureLoader().load( "./front.png" );
+        var texture = new THREE.TextureLoader().load( "./cube.png" );
         //var texture = new THREE.TextureLoader().load( "textures/UV_Grid_Sm.jpg" );
 		texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
 		
@@ -450,34 +446,34 @@ onload = function(){
     // imagesData サイズ６のImageData型の配列
     //            0 front, 1 back, 2 left, 3 right, 4 top, 5 bottom
     ///////////////////////////////////////////////////////////////////////
-    function createVolumeDataFromImagesData(imagesData){
+    // function createVolumeDataFromImagesData(imagesData){
         
-        var width = imagesData[0].width;
-        var height = imagesData[0].height;//image height
-        var zMax = width;
-        var sArrays = [];//signed distance Arrayの配列
+    //     var width = imagesData[0].width;
+    //     var height = imagesData[0].height;//image height
+    //     var zMax = width;
+    //     var sArrays = [];//signed distance Arrayの配列
         
-        for(var i = 0; i < imageNum; ++i)
-        {
-            sArrays[i] = new Float32Array(width * height);
-        }
+    //     for(var i = 0; i < imageNum; ++i)
+    //     {
+    //         sArrays[i] = new Float32Array(width * height);
+    //     }
         
-        for(var i = 0; i < imageNum; ++i){
-            var srcImageData = imagesData[i];
-            sArrays[i] = createSignedDistArrayFromImageData(srcImageData);
-        }
+    //     for(var i = 0; i < imageNum; ++i){
+    //         var srcImageData = imagesData[i];
+    //         sArrays[i] = createSignedDistArrayFromImageData(srcImageData);
+    //     }
         
-        var volumeData = new Float32Array(width * height * zMax);
-        //signedDistArrayからボリュームデータを作成
-        getVolumeData(zMax, height, width, sArrays, volumeData);
+    //     var volumeData = new Float32Array(width * height * zMax);
+    //     //signedDistArrayからボリュームデータを作成
+    //     getVolumeData(zMax, height, width, sArrays, volumeData);
         
-        return volumeData;
-    }
+    //     return volumeData;
+    // }
     
     ///////////////////////////////////////////////////////////////////////
     //2枚の画像データから密度データを生成する
     ///////////////////////////////////////////////////////////////////////
-    function createVolumeDataFrom2ImgData(imgData0, imgData1){
+    function createVolumeDataFrom2ImgData(imgData0, imgData1, rotateFlag){
         
         var width = imgData0.width;
         var height = imgData0.height;//image height
@@ -491,7 +487,7 @@ onload = function(){
         var volumeData = new Float32Array(width * height * zMax);
         
         //signedDistArrayからボリュームデータを作成
-        getVolumeDataFrom2Img(zMax, height, width, sArrays[0], sArrays[1], volumeData);
+        getVolumeDataFrom2Img(zMax, height, width, sArrays[0], sArrays[1], volumeData, rotateFlag);
         
         return volumeData;
     }
@@ -570,7 +566,7 @@ onload = function(){
 		llightness: 0.5,
 		lx: 0.5,
 		ly: 0.5,
-		lz: 1.0,
+		lz: -1.0,
 		postprocessing: false,
 		dummy: function() {
 		}
@@ -634,7 +630,7 @@ getExtrusionFunction = function(sf, sb, z,zMax){
 ///////////////////////////////////////////////////////////
 //対になった符号付距離画像の配列からボリュームデータを得る
 ///////////////////////////////////////////////////////////
-getVolumeDataFrom2Img = function(zMax, height, width, array0, array1, volumeData)
+getVolumeDataFrom2Img = function(zMax, height, width, array0, array1, volumeData, rotateFlag)
 {
      //volume data
      //array0とarray1は対になっている
@@ -642,19 +638,22 @@ getVolumeDataFrom2Img = function(zMax, height, width, array0, array1, volumeData
       var sfArray = array0;
       var sbArray = array1;
       
-        for(var z = 0; z < zMax; ++z)
-        {
-            for(var y = 0; y < height; ++y)
-            {
-                for(var x = 0; x < width; ++x)
-                {
-                var idx = z * height * width + y * width + x;
-                var idx2 = y * width + x;
-                var zdiv = z/zMax;
+        var side = width;
+        for(var x = 0; x < side; ++x){
+            var div = x/side;
+            for(var y = 0; y < side; ++y){
+                for(var z = 0; z < side; ++z){
+                var idx = x + y * side + z * side * side;
                 
-                volumeData[idx] = getExtrusionFunction(sfArray[idx2], sbArray[idx2],  zdiv, 1.0);
+                var idx2Array = [y * width + x, (side-1-z) * side + y, x * side + side-1-z];
+                
+                var idx2 = idx2Array[rotateFlag];
+                volumeData[idx] = getExtrusionFunction(sfArray[idx2], sbArray[idx2], div, 1.0);
+                    
                 }
+                
             }
+            
         }
 }
 
@@ -668,13 +667,13 @@ getVolumeData = function(zMax, height, width, sArrays, volumeData){
       
         for(var z = 0; z < zMax; ++z)
         {
+            var zdiv = z/zMax;
             for(var y = 0; y < height; ++y)
             {
                 for(var x = 0; x < width; ++x)
                 {
                 var idx = z * height * width + y * width + x;
                 var idx2 = y * width + x;
-                var zdiv = z/zMax;
                 
                 volumeData[idx] = getExtrusionFunction(sfArray[idx2], sbArray[idx2],  zdiv, 1.0);
                 }
