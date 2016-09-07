@@ -15,3 +15,9 @@ git push
 もしgitpushでエラーが出たらリモートのリポジトリと同期する
 git pull
 git push
+
+上のでだめなら
+git pull
+git add .
+git commit -m "commit"
+git push

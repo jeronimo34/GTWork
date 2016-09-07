@@ -556,9 +556,9 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 					for ( z = min_z; z < max_z; z ++ ) {
 						zdiv = (z-min_z) / (max_z - min_z);
 						
-						idx = Math.floor(zdiv * sizeZ) * sizeY * sizeX
-						    + Math.floor(ydiv * sizeY) * sizeX
-						    + Math.floor(xdiv * sizeX);
+						idx = z * sizeY * sizeX
+						    + (max_y-1-y) * sizeX
+						    + x;
 						
 						voldata = volumeData[idx];
 						

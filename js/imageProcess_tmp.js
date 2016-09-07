@@ -3,7 +3,7 @@
 //2値化フィルター
 //srcImage ImageData 元の画素データ(rgba)
 //dstImage ImageData 出力画像データ(rgba)
-//dstArray 0 -> black 255 -> white
+//dstArray 0 -> black 1 -> white
 //thresh 閾値　この値を上回ると白くなる。
 ///////////////////////////////////////////////////////////
 binarizationFilter = function(srcImage, dstArray, thresh){
@@ -25,7 +25,7 @@ binarizationFilter = function(srcImage, dstArray, thresh){
                 
                 var gray = (r + g + b)/3;
                 var color = 0;
-                if(gray > thresh)color = 255;
+                if(gray > thresh)color = 1;
                 
                 dst[i * width + j] = color;
             }
@@ -50,7 +50,7 @@ negativeFilter = function(srcArray, dstArray, width, height){
                 var idx = j + i*width;
                 var color = src[idx];
                 
-                dst[idx] = 255 - color;
+                dst[idx] = 1 - color;
             }
         }
 }
@@ -97,15 +97,13 @@ computeSignedDist = function(contourPosArray, binArray, point, width, height){
 //エッジ検出
 //Laplacianオペレータ
 //4方向２次微分オペレータ
-//binArray have 1 component. 0 black 255 white
+//binArray 1:white  0:black
+//dstArray 1:輪郭線 0:それ以外
 ///////////////////////////////////////////////////////////
-Laplacian = function(binArray, dstImage)
+Laplacian = function(binArray, dstArray, width, height)
 {
-    var width = dstImage.width;
-    var height = dstImage.height;
-    
     var src = binArray;
-    var dst = dstImage.data;
+    var dst = dstArray;
     
     //上下左右の２次微分オペレータ
    var weight = [
@@ -117,7 +115,7 @@ Laplacian = function(binArray, dstImage)
     for (var i = 0; i < height; i++) {
         for (var j = 0; j < width; j++) {
             var idx = (j + i * width) * 4;
-            var val = [0,0,0];
+            var val = 0;
         
             //オペレータを積和演算している    
             for(var k = -1; k <= 1; k++){
@@ -130,16 +128,11 @@ Laplacian = function(binArray, dstImage)
                     var idx1 = x + y * width;
                     var idx2 = (l + 1) + (k + 1)*3;
                     
-                    val[0] += weight[idx2]*src[idx1];
-                    val[1] += weight[idx2]*src[idx1];
-                    val[2] += weight[idx2]*src[idx1];
+                    val += weight[idx2]*src[idx1];
                 }
             }
             
-            dst[idx] = val[0];
-            dst[idx + 1] = val[1];
-            dst[idx + 2] = val[2];
-            dst[idx + 3] = 255;
+            dst[idx] = val;
         }
     }
 }
@@ -147,10 +140,9 @@ Laplacian = function(binArray, dstImage)
 /////////////////////////////////////////////////////////////
 //dstCoutourPosArray is Vector2 Array
 ///////////////////////////////////////////////////////////
-getContourPosArray = function(coutourImage, dstCoutourPosArray){
-    var width = coutourImage.width;
-    var height = coutourImage.height;
-    var src = coutourImage.data;
+getContourPosArray = function(coutourArray, dstCoutourPosArray, width, height){
+
+    var src = coutourArray;
     var dst = dstCoutourPosArray;
     var idx = 0;
     
@@ -158,10 +150,10 @@ getContourPosArray = function(coutourImage, dstCoutourPosArray){
     {
         for(var j = 0; j < width; ++j)
         {
-            var idx2 = (i*width + j) * 4;
+            var idx2 = i*width + j;
             
             //エッジの上にある点
-            if(src[idx2] == 255){
+            if(src[idx2] == 1){
                 dst[idx++] = new Vector2(j,i);
             }
         }
@@ -190,10 +182,10 @@ getSignedDistImage = function(coutourPosArray, binArray, dstImage, dstArray){
             var point = new Vector2(j,i);
             var distance = computeSignedDist(coutourPosArray, binArray, point,width,height);
             var idx = (j + i * width);
-	    distanceArray[idx] = distance;
-	    minDist = Math.min(distance, minDist);
-	    maxDist = Math.max(distance, maxDist);
-	    
+    	    distanceArray[idx] = distance;
+    	    minDist = Math.min(distance, minDist);
+    	    maxDist = Math.max(distance, maxDist);
+    	    
         }
     }
      
@@ -205,7 +197,7 @@ getSignedDistImage = function(coutourPosArray, binArray, dstImage, dstArray){
                 //var distance = pointPolygonTest(laplacianImage, binImage, point);
                 var distance = distanceArray[j + i*width];
 
-	        	var idx = (j + i * width) * 4;
+		        var idx = (j + i * width) * 4;
                         
                 if(distance == 0){
                     dst[idx] = 0;
@@ -234,13 +226,13 @@ getSignedDistImage = function(coutourPosArray, binArray, dstImage, dstArray){
      for(var i = 0; i < distanceArray.length; ++i) 
      {
          if(distanceArray[i] > 0){
-            distanceArray[i] /= maxDist;    
-            distanceArray[i] = 1;    
-            
-         }else if(distanceArray[i] < 0){
-             distanceArray[i] /= -minDist;
-             distanceArray[i] = -1;
+            //distanceArray[i] /= maxDist;    
+            distanceArray[i] = 1;
              
-         }else distanceArray[i] = 0;
+         }else{
+             //distanceArray[i] /= -minDist;
+            distanceArray[i] = -1;
+             
+         }
      }
 }

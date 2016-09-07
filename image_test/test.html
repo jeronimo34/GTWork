@@ -1,0 +1,139 @@
+<html>
+    <head>
+		<script src="../js/minMatrix.js"></script>
+		<script src="../js/mymath.js"></script>
+		<script src="../js/imageProcess.js"></script>
+    </head>
+    
+    <body>
+        <canvas id="canvas" width="1000" height="256">
+        </canvas>
+        
+        <script>
+            window.onload = function(){
+                var canvas = document.getElementById("canvas");
+                var context = canvas.getContext('2d');
+                var resolution = 64;
+                
+                function createSignedDistArrayFromImageData(srcImgData){
+                    var width = srcImgData.width;//image width
+                    var height = srcImgData.height;//image height
+                    var zMax = width;
+                    
+                    var srcImage = srcImgData;
+                    var dstImage = context.createImageData(width, height);
+                    
+                    var laplacianImage = context.createImageData(width, height);
+                    
+                    var binArray = [];
+                    var negativeArray = [];
+                    var coutourPosArray = [];
+                    var signedDistArray = new Float32Array(width * height);//float32 array
+                    var volumeData = new Float32Array(width * height * zMax);
+                    
+                    //image process
+                    binarizationFilter(srcImage, binArray, 1);
+                    negativeFilter(binArray, negativeArray, width, height);
+                    Laplacian(negativeArray, laplacianImage);
+                    getContourPosArray(laplacianImage, coutourPosArray);
+                    
+                    //TO DO
+                    getSignedDistImage(coutourPosArray, binArray, dstImage, signedDistArray); 
+                    
+                    context.putImageData(dstImage,0,0);
+                    return signedDistArray;
+                }
+                
+                //    
+                function resizeLaplacianArray(srcArray, width, height, resolution)
+                {
+                    var distArray = new Float32Array(resolution * resolution);
+                    for(var i = 0; i < resolution; ++i)
+                    {
+                        for(var j = 0; j < resolution; ++j)
+                        {
+                            var isCoutour = checkCoutour(srcArray, width, height, resolution, j, i);
+                            if( isCoutour )
+                            {
+                                distArray[i*resolution + j] = 0;
+                            }
+                            else distArray[i*resolution + j] = 1;
+                        }
+                    }
+                    return distArray;
+                }
+                
+                function checkCoutour(srcArray, width, height, resolution, x, y)
+                {
+                    var left = Math.floor(width/resolution * x);//256/3 = 85.3
+                    var top = Math.floor(height/resolution * y);//
+                    var right = Math.min(left + width/resolution, width);
+                    var bottom = Math.min(top + height/resolution, height);
+                    
+                    console.log("x " + x + "y" + y + "left" + left + "right" + right);
+                    var isCoutour = false;
+                    for(var i = top; i < bottom; ++i)
+                    {
+                        for(var j = left; j < right; ++j)
+                        {
+                            if(srcArray[i*width + j] == 0){
+                                isCoutour = true;
+                                break;
+                            }
+                        }
+                    }
+                    return isCoutour;
+                }
+                
+                
+                var image = new Image();
+                image.src = "../front.png";
+                
+                image.onload = function(){
+                    context.drawImage(image,0,0);
+                    var imagedata = context.getImageData(0,0,image.width,image.height);
+                    var signedArray  = createSignedDistArrayFromImageData(imagedata);
+                    signedArray = resizeLaplacianArray(signedArray, image.width, image.height, resolution);
+                    
+                    imagedata = context.createImageData(resolution, resolution);
+                    var data = imagedata.data;
+                    for(var i = 0; i < resolution; i++){
+                        for(var j = 0; j < resolution; ++j)
+                        {
+                            var idx = i*resolution + j;
+                            var idx2 = idx*4;
+                            
+                            var left = Math.floor(image.width/resolution * j);//256/3 = 85.3
+                            var top = Math.floor(image.height/resolution * i);//
+                            
+                            if(signedArray[idx] == 0){
+                                data[idx2] = 255; 
+                                data[idx2+1] = data[idx2+2] = 255; 
+                                data[idx2+3] = 255;
+                                context.fillStyle = "#ffff00";
+                            }else{
+                                data[idx2] = data[idx2+1] = data[idx2+2] = 0;
+                                data[idx2+3] = 255;
+                                context.fillStyle = "#ffffff";
+                            }
+                            
+                            context.fillRect(left, top, image.width, image.height);
+                        }
+                    }
+                    
+                    // var newCanvas = document.createElement("canvas");
+                    // newCanvas.setAttribute("width",resolution);
+                    // newCanvas.setAttribute("height",resolution);
+                    
+                    // newCanvas.getContext("2d").putImageData(imagedata, 0, 0);
+                    
+                    // context.scale(256/resolution, 256/resolution);
+                    // context.drawImage(newCanvas, 0, 0);
+                }
+                
+                    
+            }
+            
+        </script>
+    </body>
+</html>

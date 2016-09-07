@@ -3,6 +3,26 @@
 ////////////////////////////////////////////////////////////
 if(!Detector.webgl) Detector.addGetWebGLMessage();
 
+// var imageNum = 6;
+// var imagesSrc = [
+//                  './front.png',
+//                  './back.png',
+//                  './left.png',
+//                  './right.png',
+//                  './top.png',
+//                  './bottom.png'
+//                  ];
+
+// //画像のロード    
+// var images = [];
+// for(var i = 0; i < imageNum; ++i)
+// {
+//     var image = new Image();
+//     image.src = imagesSrc[i];
+//     images[i] = image;
+// }
+
+
 
 ///////////////////////////////////////////////////////////
 //ページがロードされた後に呼ばれる　すべてのリソースがロードされたとき
@@ -27,7 +47,7 @@ function initThreeJs(images1, images2){
     
     //export obj data
     var exportButton, floatingDiv;
-    var resolution = 64;
+    var max_resolution = 256;
     
     var time = 0;
     var clock = new THREE.Clock();
@@ -43,7 +63,7 @@ function initThreeJs(images1, images2){
     
     var volumeData1 = createVolumeData(images1);
     var volumeData2 = createVolumeData(images2);
-    var volumeData = new Float32Array(resolution * resolution * resolution);
+    var volumeData = new Float32Array(max_resolution * max_resolution * max_resolution);
         
     //initialize three.js
     init();
@@ -58,7 +78,14 @@ function initThreeJs(images1, images2){
     function createVolumeData(images){
         var imageNum = images.length;
         
-        var volDataX = resolution;
+        //画像が正方形になるようリサイズする
+        var mx = 0;
+        for(var i = 0; i < images.length; ++i)
+        {
+            mx = Math.max(Math.max(images[i].width, images[i].height), mx);    
+        }
+        
+        var volDataX = max_resolution;
         var volDataY = volDataX;
         var volDataZ = volDataX;
         var rlvolData, fbvolData, tbvolData;
@@ -66,7 +93,7 @@ function initThreeJs(images1, images2){
         var imagesData = [];
         //ロードした画像からimageDataの配列を作成
         for(var i = 0; i < imageNum; ++i){
-            imageData = createImageData(images[i], resolution, resolution);
+            var imageData = createImageData(images[i], mx, mx);
             imagesData[i] = imageData;
         }
         
@@ -74,7 +101,7 @@ function initThreeJs(images1, images2){
         fbvolData = createVolumeDataFrom2ImgData(imagesData[0], imagesData[1],0);//front, back
         rlvolData = createVolumeDataFrom2ImgData(imagesData[2], imagesData[3],1);//right, left
         tbvolData = createVolumeDataFrom2ImgData(imagesData[4], imagesData[5],2);//top bottom
-        var volData = new Float32Array(resolution * resolution * resolution);
+        var volData = new Float32Array(max_resolution * max_resolution * max_resolution);
         
         //三つの密度データを合わせた密度データを生成する
         for(var x = 0; x < volDataX; ++x){
@@ -87,142 +114,13 @@ function initThreeJs(images1, images2){
         }
         //
         
-        //色情報をもとに余計な部分を消す。
-        removeCell(volData, imagesData);
-        
         return volData;
         
     }
-    
-    
-    //try to use the color information to remove inconsistent cells.
-    function removeCell(volumeData, imagesData){
-        
-        var front = imagesData[0];
-        var back = imagesData[1];
-        var left = imagesData[2];
-        var right = imagesData[3];
-        var top = imagesData[4];
-        var bottom = imagesData[5];
-        
-        for(var z = 0; z < resolution; ++z)
-        {
-            for(var y = 0; y < resolution; ++y)
-            {
-                for(var x = 0; x < resolution; ++x)
-                {
-                    var volidx = z*resolution*resolution+y*resolution+x;
-                    
-                    //cell outside.
-                    if(volumeData[volidx] < 0)continue;
-                    
-                    var idxFB = (y*resolution + x)*4;
-                    var idxLR = ((resolution-1-z)*resolution + y)*4;
-                    var idxTB = (x*resolution + resolution-1-z)*4;
-                    
-                    var colorFront = [front.data[idxFB], front.data[idxFB+1], front.data[idxFB+2]];
-                    var colorBack = [back.data[idxFB], front.data[idxFB+1], front.data[idxFB+2]];
-                    var colorTop = [top.data[idxTB], top.data[idxTB+1], top.data[idxTB+2]];
-                    var colorBottom = [bottom.data[idxTB], bottom.data[idxTB+1], bottom.data[idxTB+2]];
-                    var colorLeft = [left.data[idxLR], left.data[idxLR+1], left.data[idxLR+2]];
-                    var colorRight = [right.data[idxLR], right.data[idxLR+1], right.data[idxLR+2]];
-                    
-                    //If the cell project on only 1 image, we keep the cell. 
-                    // var onlyOne = !(isSomeColor(colorFront, colorBack) ||
-                    //                 isSomeColor(colorFront, colorTop) ||
-                    //                 isSomeColor(colorFront, colorBottom) ||
-                    //                 isSomeColor(colorFront, colorLeft) ||
-                    //                 isSomeColor(colorFront, colorRight));
-                                    
-                    // // onlyOne &=    !(isSomeColor(colorBack, colorFront) ||
-                    // //                 isSomeColor(colorBack, colorTop) ||
-                    // //                 isSomeColor(colorBack, colorBottom) ||
-                    // //                 isSomeColor(colorBack, colorLeft) ||
-                    // //                 isSomeColor(colorFront, colorRight));
-                    
-                    // // onlyOne &=    !(isSomeColor(colorTop, colorFront) ||
-                    // //                 isSomeColor(colorTop, colorBack) ||
-                    // //                 isSomeColor(colorTop, colorBottom) ||
-                    // //                 isSomeColor(colorTop, colorLeft) ||
-                    // //                 isSomeColor(colorTop, colorRight));
-                    
-                    // // onlyOne &=    !(isSomeColor(colorBottom, colorFront) ||
-                    // //                 isSomeColor(colorBottom, colorTop) ||
-                    // //                 isSomeColor(colorBottom, colorBack) ||
-                    // //                 isSomeColor(colorBottom, colorLeft) ||
-                    // //                 isSomeColor(colorBottom, colorRight));
-                    
-                    // onlyOne &=    !(isSomeColor(colorLeft, colorFront) ||
-                    //                 isSomeColor(colorLeft, colorTop) ||
-                    //                 isSomeColor(colorLeft, colorBottom) ||
-                    //                 isSomeColor(colorLeft, colorBack) );
-                    
-                    // onlyOne &=    !(isSomeColor(colorRight, colorFront) ||
-                    //                 isSomeColor(colorRight, colorTop) ||
-                    //                 isSomeColor(colorRight, colorBottom) ||
-                    //                 isSomeColor(colorRight, colorBack));
-                                    
-                    
-                    //if( onlyOne ) break; //keep cell
-                    
-                    //If the cell projects on several images, look up the corresponding pixel color on each image. 
-                    //If the pixel colors are similar, then we keep the cell
-                    var someColor =  (isSomeColor(colorFront, colorTop)
-                                     ||isSomeColor(colorFront, colorBottom))
-                                     && 
-                                     (isSomeColor(colorFront, colorLeft)
-                                     || isSomeColor(colorFront, colorRight));
-                    
-                    someColor |=     (isSomeColor(colorBack, colorTop)
-                                     ||isSomeColor(colorBack, colorBottom))
-                                     && 
-                                     (isSomeColor(colorBack, colorLeft)
-                                     || isSomeColor(colorBack, colorRight));
-                     
-                    someColor |=     (isSomeColor(colorTop, colorFront)
-                                     ||isSomeColor(colorTop, colorBack))
-                                     && 
-                                     (isSomeColor(colorTop, colorLeft)
-                                     || isSomeColor(colorTop, colorRight));
-                                     
-                    someColor |=     (isSomeColor(colorBottom, colorFront)
-                                     ||isSomeColor(colorBottom, colorBack))
-                                     && 
-                                     (isSomeColor(colorBottom, colorLeft)
-                                     || isSomeColor(colorBottom, colorRight));
-                    
-                    someColor |=     (isSomeColor(colorLeft, colorFront)
-                                     || isSomeColor(colorLeft, colorBack))
-                                     && 
-                                     (isSomeColor(colorLeft, colorTop)
-                                     || isSomeColor(colorLeft, colorBottom));
-                    
-                    someColor |=     (isSomeColor(colorRight, colorFront)
-                                     ||isSomeColor(colorRight, colorBack))
-                                     && 
-                                     (isSomeColor(colorRight, colorTop)
-                                     || isSomeColor(colorRight, colorBottom));
-                    
-                    
-                    //If the pixel colors are similar, then keep the cell.
-                    //otherwase, discard it.
-                    if(someColor){
-                        //keep cell
-                    }
-                    else volumeData[volidx] = -1;//remove
-                        
-                }
-            }
-        }
-        
-    }
-    
-    function isSomeColor(color0, color1){
-        return (color0[0] == color1[0]) && (color0[1] == color1[1]) && (color0[2] == color1[2]);
-    }
-    
+
     /////////////////////////////////////////////////////////////
     //ロード済みの画像からimageDataを作成
+    //画像はwidth X heightにリサイズされる
     /////////////////////////////////////////////////////////////
     function createImageData(image, width, height){
         
@@ -272,6 +170,10 @@ function initThreeJs(images1, images2){
         //MATERIALS
         current_material = "colors";
         materials = generateMaterials();
+        
+        //MARCHING CUBES
+        resolution = 28;//立方体の1辺の長さ
+        //numBlobs = 10;//metabolls num
         
         //空間の分割数、マテリアル、テクスチャ、カラー、CCW
         effect = new THREE.MarchingCubes( resolution, materials[ current_material ].m, true, true , true);
@@ -356,10 +258,8 @@ function initThreeJs(images1, images2){
     	floatingDiv = document.createElement( 'div' );
 		floatingDiv.className = 'floating';
 		document.body.appendChild( floatingDiv );
-		
-		//marching cubes
-        effect.init(resolution);
-        //marching cube
+
+        effect.init(max_resolution);
         updateModel(effect);
     }
 
@@ -440,7 +340,7 @@ function initThreeJs(images1, images2){
     //アニメーション　コールバックされる。
     /////////////////////////////////////////////////////////////////////////
     function animate(){
-        requestAnimationFrame(animate);
+        //requestAnimationFrame(animate);
         render();
         stats.update()
     }
@@ -453,15 +353,12 @@ function initThreeJs(images1, images2){
         time += delta * effectController.speed * 0.5;
         controls.update(delta);
         
-      
-        
         //lights
         light.position.set( effectController.lx, effectController.ly, effectController.lz );
 		light.position.normalize();
 		pointLight.color.setHSL( effectController.lhue, effectController.lsaturation, effectController.llightness );
 		
         // render
-        
         if ( effectController.postprocessing ){
             composer.render(delta);
         } else {
@@ -517,7 +414,7 @@ function initThreeJs(images1, images2){
         
         return materials;
     }
-
+    
     
     ///////////////////////////////////////////////////////////////////////
     //this controls content of marching cubes voxel field
@@ -529,10 +426,10 @@ function initThreeJs(images1, images2){
         var morph = effectController.morph;
         
         //三つの密度データを合わせた密度データを生成する
-        for(var x = 0; x < resolution; ++x){
-            for(var y = 0; y <  resolution; ++y){
-                for(var z = 0; z < resolution; ++z){
-                    var idx0 = x + y*resolution + z*resolution*resolution;
+        for(var x = 0; x < max_resolution; ++x){
+            for(var y = 0; y <  max_resolution; ++y){
+                for(var z = 0; z < max_resolution; ++z){
+                    var idx0 = x + y*max_resolution + z*max_resolution*max_resolution;
                     volumeData[idx0] = volumeData1[idx0] * (1.0-morph) + volumeData2[idx0]*morph;
                 }
             }
@@ -541,9 +438,9 @@ function initThreeJs(images1, images2){
         
         object.addExtrusionObject(
         volumeData,
-        resolution, 
-        resolution, 
-        resolution);
+        max_resolution, 
+        max_resolution, 
+        max_resolution);
     }
     
     ///////////////////////////////////////////////////////////////////////
@@ -560,10 +457,10 @@ function initThreeJs(images1, images2){
         sArrays[1] = createSignedDistArrayFromImageData(imgData1);
         
         
-        var volumeData = new Float32Array(resolution*resolution*resolution);
+        var volumeData = new Float32Array(width * height * zMax);
         
         //signedDistArrayからボリュームデータを作成
-        getVolumeDataFrom2Img(resolution, resolution, resolution, sArrays[0], sArrays[1], volumeData, rotateFlag);
+        getVolumeDataFrom2Img(zMax, height, width, sArrays[0], sArrays[1], volumeData, rotateFlag);
         
         return volumeData;
     }
@@ -576,61 +473,67 @@ function initThreeJs(images1, images2){
         var srcImage = srcImgData;
         var dstImage = context.createImageData(width, height);
         
-        var laplacianImage = context.createImageData(width, height);
-        
         var binArray = [];
         var negativeArray = [];
+        var laplacianArray = [];
         var coutourPosArray = [];
         var signedDistArray = new Float32Array(width * height);//float32 array
-        var volumeData = new Float32Array(width * height * zMax);
         
         //image process
         binarizationFilter(srcImage, binArray, 1);
         negativeFilter(binArray, negativeArray, width, height);
-        Laplacian(negativeArray, laplacianImage);
-        getContourPosArray(laplacianImage, coutourPosArray);
+        Laplacian(negativeArray, laplacianArray);
         
-        //TO DO
+        //resize laplacianArray
+        //１辺がresolutionになるようにリサイズする。
+        //distArrayのサイズはresolution X resolution
+        //laplacianArray = resizeLaplacianArray(laplacianArray, width, height, max_resolution);
+        
+        getContourPosArray(laplacianArray, coutourPosArray);
         getSignedDistImage(coutourPosArray, binArray, dstImage, signedDistArray); 
-        //signedDistArray = resizeSignedDistArray(signedDistArray, width, height, resolution);
+        
         return signedDistArray;
     }
-    
+
     //    
-    // function resizeSignedDistArray(srcArray, width, height, resolution)
-    // {
-    //     var distArray = new Float32Array(resolution * resolution);
-    //     for(var i = 0; i < resolution; ++i)
-    //     {
-    //         for(var j = 0; j < resolution; ++j)
-    //         {
-    //             distArray[i*resolution + j] = checkCoutour(srcArray, width, height, resolution, j, i);
-    //         }
-    //     }
-    //     return distArray;
-    // }
+    function resizeLaplacianArray(srcArray, width, height, resolution)
+    {
+        var distArray = new Float32Array(resolution * resolution);
+        for(var i = 0; i < resolution; ++i)
+        {
+            for(var j = 0; j < resolution; ++j)
+            {
+                var isCoutour = checkCoutour(srcArray, width, height, resolution, j, i);
+                if( isCoutour )
+                {
+                    distArray[i*resolution + j] = 1;
+                }
+                else distArray[i*resolution + j] = 0;
+            }
+        }
+        return distArray;
+    }
     
-    // function checkCoutour(srcArray, width, height, resolution, x, y)
-    // {
-    //     var left = Math.floor(width/resolution * x);//256/3 = 85.3
-    //     var top = Math.floor(height/resolution * y);//
-    //     var right = Math.min(left + width/resolution, width);
-    //     var bottom = Math.min(top + height/resolution, height);
+    function checkCoutour(srcArray, width, height, resolution, x, y)
+    {
+        var left = Math.floor(width/resolution) * x;
+        var top = Math.floor(height/resolution) * y;
+        var right = Math.min(left + resolution, width);
+        var bottom = Math.min(top + resolution, height);
         
-    //     //console.log("x " + x + "y" + y + "left" + left + "right" + right);
-    //     var isCoutour = srcArray[top*width + left];
-    //     for(var i = top; i < bottom; ++i)
-    //     {
-    //         for(var j = left; j < right; ++j)
-    //         {
-    //             if(srcArray[i*width + j] == 0){
-    //                 isCoutour = 0;
-    //                 break;
-    //             }
-    //         }
-    //     }
-    //     return isCoutour;
-    // }
+        var isCoutour = false;
+        for(var i = top; i < bottom; ++i)
+        {
+            for(var j = left; j < right; ++j)
+            {
+                if(srcArray[i*width + j] == 1){
+                    isCoutour = true;
+                    break;
+                }
+            }
+        }
+        return isCoutour;
+    }
     
     ///////////////////////////////////////////////////////////
     //guiの初期化
@@ -665,7 +568,7 @@ function initThreeJs(images1, images2){
 		material: "shiny",
 		speed: 1.0,
 		numBlobs: 10,
-		//resolution: 28,
+		resolution: 28,
 		isolation: 80,
 		floor: true,
 		wallx: false,
@@ -710,11 +613,11 @@ function initThreeJs(images1, images2){
 		h.add( effectController, "lx", -1.0, 1.0, 0.025 ).name("x");
 		h.add( effectController, "ly", -1.0, 1.0, 0.025 ).name("y");
 		h.add( effectController, "lz", -1.0, 1.0, 0.025 ).name("z");
+		
 		// simulation
 		//h = gui.addFolder( "Simulation" );
-		//h.add( effectController, "speed", 0.1, 8.0, 0.05 );
-		//h.add( effectController, "numBlobs", 1, 50, 1 );
-		//h.add( effectController, "resolution", 14, resolution, 1 );
+		//h.add( effectController, "resolution", 14, max_resolution, 1 );
+		
 		//h.add( effectController, "isolation", 10, 300, 1 );
 		//h.add( effectController, "floor" );
 		//h.add( effectController, "wallx" );
@@ -723,8 +626,8 @@ function initThreeJs(images1, images2){
 		h = gui.addFolder( "Rendering" );
 		h.add( effectController, "postprocessing" );
 		
-		h = gui.addFolder( "Morphing" );
-		h.add( effectController , "morph",0.0, 1.0, 0.0).name("morph");
+		//h = gui.addFolder( "Morphing" );
+		//h.add( effectController , "morph",0.0, 1.0, 0.0).name("morph");
 	}
 	
 
