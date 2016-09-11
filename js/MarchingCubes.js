@@ -707,7 +707,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 	};
 
 	this.render = function ( renderCallback ) {
-
+		console.log(renderCallback);
 		this.begin();
 
 		// Triangulate. Yeah, this is slow.
@@ -742,7 +742,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 	};
 
 	this.generateGeometry = function() {
-
+		
 		var start = 0, geo = new THREE.Geometry();
 		var normals = [];
 

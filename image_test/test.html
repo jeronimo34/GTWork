@@ -70,7 +70,6 @@
                     var right = Math.min(left + width/resolution, width);
                     var bottom = Math.min(top + height/resolution, height);
                     
-                    console.log("x " + x + "y" + y + "left" + left + "right" + right);
                     var isCoutour = false;
                     for(var i = top; i < bottom; ++i)
                     {
@@ -87,37 +86,41 @@
                 
                 
                 var image = new Image();
-                image.src = "../front.png";
+                image.src = "./front.png";
                 
                 image.onload = function(){
-                    context.drawImage(image,0,0);
-                    var imagedata = context.getImageData(0,0,image.width,image.height);
+                    context.drawImage(image,0,0,image.width,image.height);
+                    
+                    var imagedata = context.getImageData(0,0,image.width, image.height);
                     var signedArray  = createSignedDistArrayFromImageData(imagedata);
-                    signedArray = resizeLaplacianArray(signedArray, image.width, image.height, resolution);
+                    //signedArray = resizeLaplacianArray(signedArray, image.width, image.height, resolution);
                     
                     imagedata = context.createImageData(resolution, resolution);
                     var data = imagedata.data;
-                    for(var i = 0; i < resolution; i++){
-                        for(var j = 0; j < resolution; ++j)
+                    
+                    var scale = 20;
+                    
+                    for(var i = 0; i < image.height; i++){
+                        for(var j = 0; j < image.width; ++j)
                         {
-                            var idx = i*resolution + j;
+                            var idx = i*image.height + j;
                             var idx2 = idx*4;
                             
-                            var left = Math.floor(image.width/resolution * j);//256/3 = 85.3
-                            var top = Math.floor(image.height/resolution * i);//
+                            var left = j*scale;//256/3 = 85.3
+                            var top = i*scale;//
                             
                             if(signedArray[idx] == 0){
                                 data[idx2] = 255; 
                                 data[idx2+1] = data[idx2+2] = 255; 
                                 data[idx2+3] = 255;
-                                context.fillStyle = "#ffff00";
+                                context.fillStyle = "#ff0000";
                             }else{
                                 data[idx2] = data[idx2+1] = data[idx2+2] = 0;
                                 data[idx2+3] = 255;
-                                context.fillStyle = "#ffffff";
+                                context.fillStyle = "#000000";
                             }
                             
-                            context.fillRect(left, top, image.width, image.height);
+                            context.fillRect(left, top, scale, scale);
                         }
                     }
                     
