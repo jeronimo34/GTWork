@@ -96,7 +96,7 @@ function initThreeJs(images0, images1){
         
     }
     
-    
+    //the voxel carving procedure
     //try to use the color information to remove inconsistent cells.
     function removeCell(volumeData, imagesData){
         
@@ -472,8 +472,6 @@ function initThreeJs(images0, images1){
         time += delta * effectController.speed * 0.5;
         controls.update(delta);
         
-        //updatemodel
-        //updateModel(volToGeometory);
         
         //lights
         light.position.set( effectController.lx, effectController.ly, effectController.lz );
@@ -494,7 +492,7 @@ function initThreeJs(images0, images1){
     //マテリアルの生成
     ///////////////////////////////////////////////////////////////////////////
     function generateMaterials(){
-        var texture = new THREE.TextureLoader().load( "./cube.png" );
+        var texture = new THREE.TextureLoader().load( "mario_image/front.png" );
         //var texture = new THREE.TextureLoader().load( "textures/UV_Grid_Sm.jpg" );
 		texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
 		
@@ -561,7 +559,8 @@ function initThreeJs(images0, images1){
                 }
             }
         }
-        object.setVolumeData(volumeData);
+        object.update(volumeData);
+        //console.log("name" + object);
     }
     
     ///////////////////////////////////////////////////////////////////////
@@ -661,7 +660,7 @@ function initThreeJs(images0, images1){
 		ly: 0.5,
 		lz: 1.0,
 		postprocessing: false,
-		
+		changemorph: false,
 		dummy: function() {},
 		};
 		
@@ -698,7 +697,13 @@ function initThreeJs(images0, images1){
 		h.add( effectController, "postprocessing" );
 		
 		h = gui.addFolder( "Morphing" );
+		
+		effectController[ "changemorph" ] = function() {
+		    updateModel(volToGeometory);
+		};//handler
+		
 		h.add( effectController , "morph",0.0, 1.0, 0.0).name("morph");
+		h.add( effectController , "changemorph").name("update morph");
 	}
 	
 

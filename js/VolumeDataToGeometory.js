@@ -24,7 +24,8 @@ THREE.VolumeDataToGeometory = function(resolution, material){
 
 		this.maxCount = 4096; // TODO: find the fastest size for this buffer
 		this.count = 0;
-
+        this.count_cache = 0;
+        
 		this.hasPositions = false;
 		this.hasNormals = false;
 		this.hasColors = false;
@@ -32,6 +33,21 @@ THREE.VolumeDataToGeometory = function(resolution, material){
 
 		this.positionArray = new Float32Array( this.size3 * 3 * 6 * 6);
 		this.normalArray   = new Float32Array( this.size3 * 3 * 6 * 6);
+    }
+    
+    ////////////////////////////////
+    //updates
+    ////////////////////////////////
+    this.reset = function(){
+        for(var i = 0; i < this.size3; ++i){
+            this.field[i] = 0.0;
+        }
+        this.count = 0;
+        this.count_cache = 0;
+    }
+    
+    function outOfRange(val, mn, mx){
+        return val < mn || mx < val;
     }
     
     this.setVolumeData = function(volumeData){
@@ -45,58 +61,10 @@ THREE.VolumeDataToGeometory = function(resolution, material){
         }
     }
     
-    ////////////////////////////////
-    //updates
-    ////////////////////////////////
-    this.reset = function(){
-        for(var i = 0; i < this.size3; ++i){
-            this.field[i] = 0.0;
-        }
-    }
-    
-    this.begin = function(){
-        //   
-        this.count = 0;
-
-		this.hasPositions = false;
-		this.hasNormals = false;
-		this.hasUvs = false;
-		this.hasColors = false; 
-    }
-    
-    this.end = function( renderCallback ){
-        if ( this.count === 0 ) return;
-
-		for ( var i = this.count * 3; i < this.positionArray.length; i ++ ) {
-			this.positionArray[ i ] = 0.0;
-		}
-
-		this.hasPositions = true;
-		this.hasNormals = true;
-
-		if ( this.enableUvs ) {
-
-			this.hasUvs = true;
-
-		}
-
-		if ( this.enableColors ) {
-
-			this.hasColors = true;
-
-		}
-        //console.log("count : " + this.count);
-		renderCallback( this );
-    }
-    
-    function outOfRange(val, mn, mx){
-        return val < mn || mx < val;
-    }
-    
-    this.render = function( renderCallback ){
-        //console.log(renderCallback);
+    this.update = function(volumeData){
+        this.setVolumeData(volumeData);
         
-        this.begin();
+        //polygonization
         for(var x = 0; x < this.size; ++x){
             for(var y = 0; y < this.size; ++y){
                 for(var z = 0; z < this.size; ++z){
@@ -189,7 +157,30 @@ THREE.VolumeDataToGeometory = function(resolution, material){
                 }
             }
         }
-        this.end(renderCallback);
+        this.count_cache = this.count;
+    }
+    
+    this.render = function( renderCallback ){
+        this.count = this.count_cache;
+        if ( this.count === 0 ) return;
+
+        this.hasPositions = true;
+		this.hasNormals = true;
+
+		if ( this.enableUvs ) {
+
+			this.hasUvs = true;
+
+		}
+
+		if ( this.enableColors ) {
+
+			this.hasColors = true;
+
+		}
+
+        renderCallback(this);
+        
     }
     
     this.generateGeometry = function() {
