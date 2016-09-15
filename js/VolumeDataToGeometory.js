@@ -1,11 +1,10 @@
 //ボリュームデータからボクセルメッシュを生成する
-console.log("load voldatatogeo");
-THREE.VolumeDataToGeometory = function(resolution, material){
+THREE.VolumeDataToGeometory = function(resolution, material, enableColors){
     
     THREE.ImmediateRenderObject.call(this, material);
     
     this.enableUvs = false;
-	this.enableColors = false;
+	this.enableColors = enableColors !== undefined ? enableColors : false;
 
     this.init = function(resolution)
     {
@@ -33,6 +32,10 @@ THREE.VolumeDataToGeometory = function(resolution, material){
 
 		this.positionArray = new Float32Array( this.size3 * 3 * 6 * 6);
 		this.normalArray   = new Float32Array( this.size3 * 3 * 6 * 6);
+		
+		if( this.enableColors ){
+		    this.colorArray = new Float32Array( this.size3 * 3 * 6 * 6);
+		}
     }
     
     ////////////////////////////////
@@ -61,7 +64,12 @@ THREE.VolumeDataToGeometory = function(resolution, material){
         }
     }
     
-    this.update = function(volumeData){
+    this.binaryColorToArray = function(bin)
+    {
+        return [((bin >> 16) & 0xff), ((bin >> 8) & 0xff), (bin & 0xff)];
+    }
+    
+    this.update = function(volumeData, colorData){
         this.setVolumeData(volumeData);
         
         //polygonization
@@ -94,69 +102,37 @@ THREE.VolumeDataToGeometory = function(resolution, material){
                             
                         }
                         
-                        //add quad
                         for(var j = 0; j < noExistsAdjacentCells.length; ++j){
-                            var i = noExistsAdjacentCells[j];
-                            var p0 = cubeVertices[cubeFaces[i*6+0]];
-                            var p1 = cubeVertices[cubeFaces[i*6+1]];
-                            var p2 = cubeVertices[cubeFaces[i*6+2]];
-                            var p3 = cubeVertices[cubeFaces[i*6+3]];
-                            var p4 = cubeVertices[cubeFaces[i*6+4]];
-                            var p5 = cubeVertices[cubeFaces[i*6+5]];
+                            var faceidx = noExistsAdjacentCells[j];
                             
-                            this.positionArray[this.count*3 + 0] = (x+p0[0]) * this.invsize;
-                            this.positionArray[this.count*3 + 1] = (y+p0[1]) * this.invsize;
-                            this.positionArray[this.count*3 + 2] = (z+p0[2]) * this.invsize;
-                            this.normalArray[this.count*3 + 0] = cubeNormals[i][0];
-                            this.normalArray[this.count*3 + 1] = cubeNormals[i][1];
-                            this.normalArray[this.count*3 + 2] = cubeNormals[i][2];
-                            this.count += 1;
-                            
-                            this.positionArray[this.count*3  + 0] = (x+p1[0]) * this.invsize;
-                            this.positionArray[this.count*3  + 1] = (y+p1[1]) * this.invsize;
-                            this.positionArray[this.count*3  + 2] = (z+p1[2]) * this.invsize;
-                            this.normalArray[this.count*3  + 0] = cubeNormals[i][0];
-                            this.normalArray[this.count*3  + 1] = cubeNormals[i][1];
-                            this.normalArray[this.count*3  + 2] = cubeNormals[i][2];
-                            this.count += 1;
-                            
-                            this.positionArray[this.count*3  + 0] = (x+p2[0]) * this.invsize;
-                            this.positionArray[this.count*3  + 1] = (y+p2[1]) * this.invsize;
-                            this.positionArray[this.count*3  + 2] = (z+p2[2]) * this.invsize;
-                            this.normalArray[this.count*3  + 0] = cubeNormals[i][0];
-                            this.normalArray[this.count*3  + 1] = cubeNormals[i][1];
-                            this.normalArray[this.count*3  + 2] = cubeNormals[i][2];
-                            this.count += 1;
-                            
-                            this.positionArray[this.count*3  + 0] = (x+p3[0]) * this.invsize;
-                            this.positionArray[this.count*3  + 1] = (y+p3[1]) * this.invsize;
-                            this.positionArray[this.count*3  + 2] = (z+p3[2]) * this.invsize;
-                            this.normalArray[this.count*3  + 0] = cubeNormals[i][0];
-                            this.normalArray[this.count*3  + 1] = cubeNormals[i][1];
-                            this.normalArray[this.count*3  + 2] = cubeNormals[i][2];
-                            this.count += 1;
-                            
-                            this.positionArray[this.count*3  + 0] = (x+p4[0]) * this.invsize;
-                            this.positionArray[this.count*3  + 1] = (y+p4[1]) * this.invsize;
-                            this.positionArray[this.count*3  + 2] = (z+p4[2]) * this.invsize;
-                            this.normalArray[this.count*3  + 0] = cubeNormals[i][0];
-                            this.normalArray[this.count*3  + 1] = cubeNormals[i][1];
-                            this.normalArray[this.count*3  + 2] = cubeNormals[i][2];
-                            this.count += 1;
-                            
-                            this.positionArray[this.count*3  + 0] = (x+p5[0]) * this.invsize;
-                            this.positionArray[this.count*3  + 1] = (y+p5[1]) * this.invsize;
-                            this.positionArray[this.count*3  + 2] = (z+p5[2]) * this.invsize;
-                            this.normalArray[this.count*3  + 0] = cubeNormals[i][0];
-                            this.normalArray[this.count*3  + 1] = cubeNormals[i][1];
-                            this.normalArray[this.count*3  + 2] = cubeNormals[i][2];
-                            this.count += 1;
+                            //add quad
+                            for(var k = 0; k < 6; ++k){
+                                var p = cubeVertices[cubeFaces[faceidx*6+k]];
+                                
+                                this.positionArray[this.count*3 + 0] = ((x+p[0])-this.halfsize) / this.halfsize;
+                                this.positionArray[this.count*3 + 1] = ((y+p[1])-this.halfsize) / this.halfsize;
+                                this.positionArray[this.count*3 + 2] = ((z+p[2])-this.halfsize) / this.halfsize;
+                                this.normalArray[this.count*3 + 0] = cubeNormals[faceidx][0];
+                                this.normalArray[this.count*3 + 1] = cubeNormals[faceidx][1];
+                                this.normalArray[this.count*3 + 2] = cubeNormals[faceidx][2];
+                                
+                                if( this.enableColors ){
+                                    var color = this.binaryColorToArray(colorData[idx]);
+                                    var inv = 1.0/255.0;
+                                    this.colorArray[this.count*3+0] = color[0] * inv;//x * this.invsize;
+                                    this.colorArray[this.count*3+1] = color[1] * inv;
+                                    this.colorArray[this.count*3+2] = color[2] * inv;
+                                }
+                                
+                                this.count += 1;
+                            }
                             
                         }
                     }
                 }
             }
         }
+        
         this.count_cache = this.count;
     }
     

@@ -3,6 +3,44 @@
 ////////////////////////////////////////////////////////////
 if(!Detector.webgl) Detector.addGetWebGLMessage();
 
+var MARGIN = 0;
+var SCREEN_WIDTH = window.innerWidth;
+var SCREEN_HEIGHT = window.innerHeight - 2 * MARGIN;
+
+var container, stats;
+
+var camera, scene, renderer, controls;
+var light, light2, pointLight, ambientLight;
+var mesh, texture, geometry, materials, material, current_material;
+
+var cube_material;
+var shader_uniforms;
+
+//MARCHING CUBES
+var resolution, numBlobs;
+var composer, effectFXAA, hblur, vblur;
+var effect;
+
+var volToGeometory;
+
+//export obj data
+var exportButton, floatingDiv;
+var resolution = 32;
+
+var time = 0;
+var clock = new THREE.Clock();
+var effectController;
+var morphController;
+var morphState = {
+    isplaying:false,
+};
+
+var canvas, context;
+
+var colorData0,colorData1,colorData;
+var volumeData0,volumeData1,volumeData;
+
+var cubeTex;
 
 ///////////////////////////////////////////////////////////
 //ページがロードされた後に呼ばれる　すべてのリソースがロードされたとき
@@ -10,714 +48,942 @@ if(!Detector.webgl) Detector.addGetWebGLMessage();
 function initThreeJs(images0, images1){
     
     //init three.js
-    var MARGIN = 0;
-    var SCREEN_WIDTH = window.innerWidth;
-    var SCREEN_HEIGHT = window.innerHeight - 2 * MARGIN;
-    
-    var container, stats;
-    
-    var camera, scene, renderer, controls;
-    var light, pointLight, ambientLight;
-    var mesh, texture, geometry, materials, material, current_material;
-    
-    
-    //MARCHING CUBES
-    var resolution, numBlobs;
-    var composer, effectFXAA, hblur, vblur;
-    
-    var volToGeometory;
-    
-    //export obj data
-    var exportButton, floatingDiv;
-    var resolution = 16;
-    
-    var time = 0;
-    var clock = new THREE.Clock();
-    var effectController;
-
-    var canvas = document.getElementById('canvas');
-    var context = canvas.getContext('2d');
+    canvas = document.getElementById('canvas');
+    context = canvas.getContext('2d');
     
     
     if ( ! canvas || ! canvas.getContext ) {
         throw new Error('canvas error');
     }
     
-    var volumeData0 = createVolumeData(images0);
-    var volumeData1 = createVolumeData(images1);
-    var volumeData = new Float32Array(resolution * resolution * resolution);
+    colorData0 = new Float32Array( resolution * resolution * resolution);
+    volumeData0 = createVolumeData(images0,colorData0);
+    //console.log(colorData0.length);
+    colorData1 = new Float32Array( resolution * resolution * resolution);
+    volumeData1 = createVolumeData(images1,colorData1);
+    
+    colorData  = new Float32Array( resolution * resolution * resolution);
+    volumeData = new Float32Array(resolution * resolution * resolution);
     
     //initialize three.js
-    init();
+    init(images0, images1);
     
     //render scene
     animate();
+}
+
+
+////////////////////////////////////////////////////////////
+//initialize three.js
+/////////////////////////////////////////////////////////
+function init(images0, images1){
+    
+    //CAMERA
+    camera = new THREE.PerspectiveCamera(45, SCREEN_WIDTH/SCREEN_HEIGHT, 1, 10000);
+    camera.position.set(1000, 1000, 3000);
+    
+    //SCENE
+    scene = new THREE.Scene();
+    
+    //LIGHT
+    light = new THREE.DirectionalLight(0x888888);
+    light.position.set(0.5, 0.5, -1);
+    scene.add(light);
+    
+    light2 = new THREE.DirectionalLight(0x888888);
+    light2.position.set(0.5, -0.5, -1);
+    scene.add(light2);
+    
+    pointLight = new THREE.PointLight( 0x333333 );
+	pointLight.position.set( 0, 700, 700 );
+	scene.add( pointLight );
+	
+	ambientLight = new THREE.AmbientLight( 0x4f4f4f );
+	scene.add( ambientLight );
+    
+    //MATERIALS
+    current_material = "colors";
+    materials = generateMaterials();
+    
+    //volumeDataToGeometory
+    //マーチングキューブといっていいのかわからない。たぶん違う。
+    volToGeometory = new THREE.VolumeDataToGeometory(resolution, materials[ current_material ].m, true);//,side:THREE.DoubleSide
+    volToGeometory.position.set(0,0,0);
+    volToGeometory.scale.set(700, 700, 700);
     
     
-    //////////////////////////////////////////////////////////////
-    //６枚の画像からボリュームデータを生成
-    //////////////////////////////////////////////////////////////
-    function createVolumeData(images){
-        var imageNum = images.length;
-        
-        var volDataX = resolution;
-        var volDataY = volDataX;
-        var volDataZ = volDataX;
-        var rlvolData, fbvolData, tbvolData;
-        
-        var imagesData = [];
-        //ロードした画像からimageDataの配列を作成
-        for(var i = 0; i < imageNum; ++i){
-            imageData = createImageData(images[i], resolution, resolution);
-            imagesData[i] = imageData;
-        }
-        
-        //volumeDataの作成
-        fbvolData = createVolumeDataFrom2ImgData(imagesData[0], imagesData[1],0);//front, back
-        rlvolData = createVolumeDataFrom2ImgData(imagesData[2], imagesData[3],1);//right, left
-        tbvolData = createVolumeDataFrom2ImgData(imagesData[4], imagesData[5],2);//top bottom
-        var volData = new Float32Array(resolution * resolution * resolution);
-        
-        //三つの密度データを合わせる
-        for(var x = 0; x < volDataX; ++x){
-            for(var y = 0; y <  volDataY; ++y){
-                for(var z = 0; z < volDataZ; ++z){
-                    var idx0 = x + y*volDataX + z*volDataX*volDataY;
-                    volData[idx0] = Math.min(fbvolData[idx0], Math.min(rlvolData[idx0], tbvolData[idx0]));
-                }
-            }
-        }
-        //
-        
-        //色情報をもとに余計な部分を消す。
-        removeCell(volData, imagesData);
-        
-        return volData;
-        
+    //MARCHING CUBES
+    //空間の分割数、マテリアル、テクスチャ、カラー、CCW
+    effect = new THREE.MarchingCubes( resolution, materials[ current_material ].m, true, true , true);
+    effect.position.set(0,0,0);
+    effect.scale.set(700, 700, 700);
+    
+    effect.enableUvs = true;
+    effect.enableColors = true;
+    effect.visible = false;//最初は非表示
+    
+    //RENDERER
+    renderer = new THREE.WebGLRenderer();
+	renderer.setClearColor(0x4f8080);
+	renderer.setPixelRatio(window.devicePixelRatio);
+	renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
+	//document.body.appendChild( renderer.domElement );
+    
+    renderer.domElement.style.position = "absolute";
+    renderer.domElement.style.top = MARGIN + "px";
+    renderer.domElement.style.left = "0px";
+    
+    container = document.getElementById( 'container' );
+    container.appendChild( renderer.domElement );
+    
+    //CONTROLS
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    
+    //STATS
+    stats = new Stats();
+    container.appendChild(stats.domElement);
+    
+    // COMPOSER
+    renderer.autoClear = false;
+    var renderTargetParameters = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat, stencilBuffer: false };
+	var renderTarget = new THREE.WebGLRenderTarget( SCREEN_WIDTH, SCREEN_HEIGHT, renderTargetParameters );
+	effectFXAA = new THREE.ShaderPass( THREE.FXAAShader );
+	hblur = new THREE.ShaderPass( THREE.HorizontalTiltShiftShader );
+	vblur = new THREE.ShaderPass( THREE.VerticalTiltShiftShader );
+	var bluriness = 8;
+	hblur.uniforms[ 'h' ].value = bluriness / SCREEN_WIDTH;
+	vblur.uniforms[ 'v' ].value = bluriness / SCREEN_HEIGHT;
+	hblur.uniforms[ 'r' ].value = vblur.uniforms[ 'r' ].value = 0.5;
+	effectFXAA.uniforms[ 'resolution' ].value.set( 1 / SCREEN_WIDTH, 1 / SCREEN_HEIGHT );
+	composer = new THREE.EffectComposer( renderer, renderTarget );
+	var renderModel = new THREE.RenderPass( scene, camera );
+	vblur.renderToScreen = true;
+	//effectFXAA.renderToScreen = true;
+	composer = new THREE.EffectComposer( renderer, renderTarget );
+	composer.addPass( renderModel );
+	composer.addPass( effectFXAA );
+	composer.addPass( hblur );
+	composer.addPass( vblur );
+    
+    
+    // GUI
+	setupGui();
+    
+    
+    //EVENT
+    window.addEventListener('click', onWindowClick, false);
+    window.addEventListener( 'resize', onWindowResize, false );
+    
+    
+    //export obj data
+    exportButton = document.getElementById( 'export' );
+    
+	exportButton.addEventListener( 'click', exportToObj);
+	floatingDiv = document.createElement( 'div' );
+	floatingDiv.className = 'floating';
+	container.appendChild( floatingDiv );
+	
+	
+	//モデルをシーンに追加
+    scene.add(volToGeometory);
+    volToGeometory.init(resolution);
+    updateModel(volToGeometory);
+    
+    scene.add(effect);
+    effect.init(resolution);
+    updateMC(effect);
+    
+    // environment map
+    var cubeTextureLoader = new THREE.CubeTextureLoader();
+    
+    shader_uniforms = {
+        "uTexCube" : { type: "t", value: cubeTextureLoader.load([rotateImage(images0[3],90,true),rotateImage(images0[2],90),
+                                                                rotateImage(images0[4],-90),rotateImage(images0[5],-90),
+                                                                rotateImage(images0[0],0),rotateImage(images0[1],0)]) },
+        "uTexCube2" : { type: "t", value: cubeTextureLoader.load([rotateImage(images1[3],90,true),rotateImage(images1[2],90),
+                                                                rotateImage(images1[4],-90),rotateImage(images1[5],-90),
+                                                                rotateImage(images1[0],0),rotateImage(images1[1],0)] )},
+        "uColor" : { type: "c", value: new THREE.Color(0xffffff) },                                                        
+        "morph" : { type: "f", value:0.0},
+        "imageScale" : {type:"f", value:0.0},
+        "uCubeScale" : {type:"v2", value:new THREE.Vector2( 0, 0 )},
+    };
+    
+    //cube material 
+    //generatematerial()の中で生成したらうまく動かなかったのでここでしている
+    cube_material = new THREE.ShaderMaterial({ 
+    uniforms : shader_uniforms,
+    vertexShader: document.getElementById("vshader").textContent, fragmentShader: document.getElementById("fshader").textContent});
+    materials['cubeMap'].m = cube_material;
+}
+
+function rotateImage(image, degree, flipY){
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    
+    var halfW = canvas.width * 0.5;
+    var halfH = canvas.height * 0.5;
+    var originx = canvas.top;
+    var originy = canvas.left;
+    
+    //一旦キャンバスをクリア
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    //canvasの状態を一旦保存
+    context.save();
+    
+    //画像の縦横半分の位置へtranslate
+    context.translate(halfW, halfH);
+    //変形マトリックスに回転を適用
+    context.rotate(degree * Math.PI / 180);
+    if(flipY === true) context.scale(1,-1);
+    
+    //translateした分戻して原点を0，0に
+    context.translate( -halfW, -halfH );
+    
+    
+    //読み込んだimgをcanvas(c1)に貼付け
+    context.drawImage(image, 0, 0);
+    
+    //canvasの状態を元に戻す
+    context.restore();
+    
+    return canvas.toDataURL();
+}
+//////////////////////////////////////////////////////////////
+//６枚の画像からボリュームデータを生成
+//////////////////////////////////////////////////////////////
+function createVolumeData(images, colorData){
+    var imageNum = images.length;
+    
+    var volDataX = resolution;
+    var volDataY = volDataX;
+    var volDataZ = volDataX;
+    var rlvolData, fbvolData, tbvolData;
+    
+    var imagesData = [];
+    //ロードした画像からimageDataの配列を作成
+    for(var i = 0; i < imageNum; ++i){
+        imageData = createImageData(images[i], images[i].naturalWidth, images[i].naturalHeight);
+        imagesData[i] = imageData;
     }
     
-    //the voxel carving procedure
-    //try to use the color information to remove inconsistent cells.
-    function removeCell(volumeData, imagesData){
+    
+    //volumeDataの作成
+    fbvolData = createVolumeDataFrom2ImgData(imagesData[0], imagesData[1],0);//front, back
+    rlvolData = createVolumeDataFrom2ImgData(imagesData[2], imagesData[3],1);//right, left
+    tbvolData = createVolumeDataFrom2ImgData(imagesData[4], imagesData[5],2);//top bottom
+    var volData = new Float32Array(resolution * resolution * resolution);
+    
+    //三つの密度データを合わせる
+    for(var x = 0; x < volDataX; ++x){
+        for(var y = 0; y <  volDataY; ++y){
+            for(var z = 0; z < volDataZ; ++z){
+                var idx0 = x + y*volDataX + z*volDataX*volDataY;
+                volData[idx0] = Math.min(fbvolData[idx0], Math.min(rlvolData[idx0], tbvolData[idx0]));
+            }
+        }
+    }
+    //
+    
+    //色情報をもとに余計な部分を消す。
+    removeCell(volData, imagesData, colorData);
+    
+    return volData;
+    
+}
+
+///////////////////////////////////////////////////////////////////
+//色は配列かバイナリであらわされ、その相互変換を行う
+///////////////////////////////////////////////////////////////////
+function colorArrayToBinary(array){
+    return (array[0] << 16) | (array[1] << 8) | (array[2]);
+}
+
+function binaryColorToArray(bin)
+{
+    return [((bin >> 16) & 0xff), ((bin >> 8) & 0xff), (bin & 0xff)];
+}
+
+
+///////////////////////////////////////////////////////////////////
+//the voxel carving procedure
+//try to use the color information to remove inconsistent cells.
+///////////////////////////////////////////////////////////////////
+function removeCell(volumeData, imagesData, colorData){
+    
+    var front = imagesData[0];
+    var back = imagesData[1];
+    var left = imagesData[2];
+    var right = imagesData[3];
+    var top = imagesData[4];
+    var bottom = imagesData[5];
+    
+    var existsRemovableCell = true;
+    var count = 0;
+    
+    while(existsRemovableCell){
+        count++;    
+        existsRemovableCell = false;
         
-        var front = imagesData[0];
-        var back = imagesData[1];
-        var left = imagesData[2];
-        var right = imagesData[3];
-        var top = imagesData[4];
-        var bottom = imagesData[5];
-        
-        var existsRemovableCell = true;
-        var count = 0;
-        
-        while(existsRemovableCell){
-            count++;    
-            existsRemovableCell = false;
-            
-            for(var z = 0; z < resolution; ++z)
+        for(var z = 0; z < resolution; ++z)
+        {
+            for(var y = 0; y < resolution; ++y)
             {
-                for(var y = 0; y < resolution; ++y)
+                for(var x = 0; x < resolution; ++x)
                 {
-                    for(var x = 0; x < resolution; ++x)
-                    {
-                        
-                        var volidx = z*resolution*resolution+y*resolution+x;
-                        
-                        //cell completely outside.
-                        if(volumeData[volidx] < 0)continue;
-                        
-                        var canProjectDirection = [];
-                        var adjacentNoOutsideCellsIdx = [];
-                        
-                        //front, back, top, bottom, left, right
-                        var dir = [[0,0,1], [0,0,-1],[0,-1,0],
-                                   [0,1,0],[-1,0,0],[1,0,0]];
-                                   
-                        //find the input images on which the cell can project.
-                        //look at its 6 adjacent cells
-                        for(var i = 0; i < 6; ++i){
-                            //１方向にレイを飛ばし、レイがどのセルとも衝突しなければ、その方向から投影することができる
-                            var ray = 1;
-                            var canProjection = true;
-                            while(true){
-                                var nx = x + dir[i][0] * ray;
-                                var ny = y + dir[i][1] * ray;
-                                var nz = z + dir[i][2] * ray;
-                                if(outOfRange(nx,0,resolution-1) || outOfRange(ny,0,resolution-1) || outOfRange(nz,0,resolution-1)){
-                                    //どのセルとも衝突しなかった
-                                    break;
-                                }
-                                var volidx2 = nz * resolution * resolution + ny * resolution + nx;
-                                if(volumeData[volidx2] >= 0){
-                                    //セルと衝突したので、この方向には投影できない
-                                    canProjection = false;
-                                    break;
-                                }
-                                ray++;
-                            }
-                            if(canProjection) canProjectDirection.push(i);
-                        }
-                        
-                        
-                        //completely inside or the cell projects only one image. keep cell
-                        if(canProjectDirection.length <= 1){
-                            continue;
-                        }
-                        
-                        //If the cell projects on several images, look up the corresponding pixel color on each image. 
-                        //If the pixel colors are similar, then we keep the cell
-                        var idxFB = (y*resolution + x)*4;
-                        var idxLR = ((resolution-1-z)*resolution + y)*4;
-                        var idxTB = (x*resolution + resolution-1-z)*4;
-                        
-                        var colorFront = [front.data[idxFB], front.data[idxFB+1], front.data[idxFB+2]];
-                        var colorBack = [back.data[idxFB], back.data[idxFB+1], back.data[idxFB+2]];
-                        
-                        var colorTop = [top.data[idxTB], top.data[idxTB+1], top.data[idxTB+2]];
-                        var colorBottom = [bottom.data[idxTB], bottom.data[idxTB+1], bottom.data[idxTB+2]];
-                        
-                        var colorLeft = [left.data[idxLR], left.data[idxLR+1], left.data[idxLR+2]];
-                        var colorRight = [right.data[idxLR], right.data[idxLR+1], right.data[idxLR+2]];
-                        
-                        var projectionColor = [colorFront, colorBack, colorTop, colorBottom, colorLeft, colorRight];
-                        
-                        var someColor =  true;
-                        
-                        //canProjectDirection.length >= 2
-                        for(var i = 0; i < canProjectDirection.length-1; ++i){
-                            var dir0 = canProjectDirection[i];
-                            var dir1 = canProjectDirection[i+1];
-                            
-                            var color0 = projectionColor[dir0];
-                            var color1 = projectionColor[dir1];
-                            //console.log("dir0" + dir0 + " dir1" + dir1);
-                            
-                            if(!isSomeColor(color0, color1)){
-                                //console.log(">>>color0 : " + color0 + "color1 : " + color1);
-                                someColor = false;
+                    
+                    var volidx = z*resolution*resolution+y*resolution+x;
+                    
+                    //cell completely outside.
+                    if(volumeData[volidx] < 0)continue;
+                    
+                    var canProjectDirection = [];
+                    
+                    //front, back, top, bottom, left, right
+                    var dir = [[0,0,1], [0,0,-1],[0,-1,0],
+                               [0,1,0],[-1,0,0],[1,0,0]];
+                               
+                    //find the input images on which the cell can project.
+                    //look at its 6 adjacent cells
+                    for(var i = 0; i < 6; ++i){
+                        //１方向にレイを飛ばし、レイがどのセルとも衝突しなければ、その方向から投影することができる
+                        var ray = 1;
+                        var canProjection = true;
+                        while(true){
+                            var nx = x + dir[i][0] * ray;
+                            var ny = y + dir[i][1] * ray;
+                            var nz = z + dir[i][2] * ray;
+                            if(outOfRange(nx,0,resolution-1) || outOfRange(ny,0,resolution-1) || outOfRange(nz,0,resolution-1)){
+                                //どのセルとも衝突しなかった
                                 break;
                             }
+                            var volidx2 = nz * resolution * resolution + ny * resolution + nx;
+                            if(volumeData[volidx2] >= 0){
+                                //セルと衝突したので、この方向には投影できない
+                                canProjection = false;
+                                break;
+                            }
+                            ray++;
                         }
-                        
-                        //If the pixel colors are some ( or similar), then keep the cell.
-                        //otherwase, discard it.
-                        if(!someColor){
-                            volumeData[volidx] = -1;//outside
-                            existsRemovableCell = true;
-                        }
-                        
+                        if(canProjection) canProjectDirection.push(i);
                     }
+                    
+                    
+                    
+                    //If the cell projects on several images, look up the corresponding pixel color on each image. 
+                    //If the pixel colors are similar, then we keep the cell
+                    var idxFB = (y*resolution + x)*4;
+                    var idxLR = ((resolution-1-z)*resolution + y)*4;
+                    var idxTB = (x*resolution + resolution-1-z)*4;
+                    
+                    var colorFront = [front.data[idxFB], front.data[idxFB+1], front.data[idxFB+2]];
+                    var colorBack = [back.data[idxFB], back.data[idxFB+1], back.data[idxFB+2]];
+                    
+                    var colorTop = [top.data[idxTB], top.data[idxTB+1], top.data[idxTB+2]];
+                    var colorBottom = [bottom.data[idxTB], bottom.data[idxTB+1], bottom.data[idxTB+2]];
+                    
+                    var colorLeft = [left.data[idxLR], left.data[idxLR+1], left.data[idxLR+2]];
+                    var colorRight = [right.data[idxLR], right.data[idxLR+1], right.data[idxLR+2]];
+                    
+                    var projectionColor = [colorFront, colorBack, colorTop, colorBottom, colorLeft, colorRight];
+                    
+                    var someColor =  true;
+                    var color0, color1;
+                    
+                    
+                    //completely inside
+                    if(canProjectDirection.length == 0){
+                        //色がわからない部分は周りの色の平均値をとってごまかす。
+                        var r,g,b,cnt;
+                        r = g = b = cnt = 0;
+                        for(var i = 0; i < 6; ++i){
+                            var nx = x + dir[i][0];
+                            var ny = y + dir[i][1];
+                            var nz = z + dir[i][2];
+                            if(outOfRange(nx,0,resolution-1) || outOfRange(ny,0,resolution-1) || outOfRange(nz,0,resolution-1)){
+                                continue;
+                            }
+                            
+                            var idx2 = nz * resolution * resolution + ny * resolution + nx;
+                            var tr = (colorData[idx2] >> 16) & 0xff;
+                            var tg = (colorData[idx2] >> 8) & 0xff;
+                            var tb = colorData[idx2] & 0xff;
+                            if( tr == 0 && tb == 0 && tg == 0)continue;
+                            r += tr;
+                            g += tg;
+                            b += tb;
+                            cnt++;
+                        }
+                        if(cnt > 0){
+                            r /= cnt;
+                            g /= cnt;
+                            b /= cnt;
+                            colorData[volidx] = colorArrayToBinary([r,g,b]);
+                        }
+                        continue;
+                    }
+                    
+                    //the cell projects only one image. keep cell
+                    if(canProjectDirection.length == 1){
+                        colorData[volidx] = colorArrayToBinary(projectionColor[canProjectDirection[0]]);
+                        continue;
+                    }
+                    
+                    //canProjectDirection.length >= 2
+                    for(var i = 0; i < canProjectDirection.length-1; ++i){
+                        var dir0 = canProjectDirection[i];
+                        var dir1 = canProjectDirection[i+1];
+                        
+                        color0 = projectionColor[dir0];
+                        color1 = projectionColor[dir1];
+                        //console.log("dir0" + dir0 + " dir1" + dir1);
+                        
+                        if(!isSomeColor(color0, color1)){
+                            //console.log(">>>color0 : " + color0 + "color1 : " + color1);
+                            someColor = false;
+                            break;
+                        }
+                    }
+                    
+                    //If the pixel colors are some ( or similar), then keep the cell.
+                    //otherwase, discard it.
+                    if(!someColor){
+                        volumeData[volidx] = -1;//outside
+                        existsRemovableCell = true;
+                    } else {
+                        colorData[volidx] = colorArrayToBinary(color0);
+                    }
+                    
                 }
             }
         }
-        console.log("repeat num = " + count);
+    }
+    console.log("repeat num = " + count);
+}
+
+function outOfRange(val, mn, mx){
+    return val < mn || mx < val;
+}
+
+function isSomeColor(color0, color1){
+    return colorArrayToBinary(color0) == colorArrayToBinary(color1);
+}
+
+function isSimilarColor(color0, color1){
+    var distance = Math.pow((color0[0]-color1[0]), 2) + Math.pow((color0[1]-color1[1]), 2) + Math.pow((color0[2]-color1[2]), 2);
+    var similarValue = distance/(255*255*3);
+    return similarValue < 0.001;//0.5%以内なら似てる
+}
+
+/////////////////////////////////////////////////////////////
+//ロード済みの画像からimageDataを作成
+//image.width * image.heightを
+//resolution * resolutionにリサイズする
+//そのままdrawImage(image, 0,0, resolution, resolution)でやると画像がぼけてしまうので
+//ぼけないようにリサイズする
+/////////////////////////////////////////////////////////////
+function createImageData(image, imgW, imgH){
+    
+    if(imgW > resolution){
+        //volumeデータ１辺のサイズより入力画像のサイズがおおきい場合
+        //かなり汚くなるけどdrawImageによるリサイズを行う
+        canvas.width = resolution;
+        canvas.height = resolution;
         
-    }
-    
-    function outOfRange(val, mn, mx){
-        return val < mn || mx < val;
-    }
-    
-    function isSomeColor(color0, color1){
-        return (color0[0] == color1[0]) && (color0[1] == color1[1]) && (color0[2] == color1[2]);
-    }
-    
-    function isSimilarColor(color0, color1){
-        var distance = Math.pow((color0[0]-color1[0]), 2) + Math.pow((color0[1]-color1[1]), 2) + Math.pow((color0[2]-color1[2]), 2);
-        var similarValue = distance/(255*255*3);
-        return similarValue < 0.1;//10%以内なら似てる
-    }
-    
-    /////////////////////////////////////////////////////////////
-    //ロード済みの画像からimageDataを作成
-    /////////////////////////////////////////////////////////////
-    function createImageData(image, width, height){
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        //黒で塗りつぶして
-        //から画像を貼る
+        //黒で塗りつぶしてから画像を貼る
         context.fillStyle = "rgb(0,0,0)";
-        context.fillRect(0,0,width,height);
-        context.drawImage(image,0,0,width,height);
-        var imageData = context.getImageData(0,0, width, height);
-        
-        context.clearRect(0,0,width,height);
-        canvas.width  = 0;
-        canvas.height = 0;
+        context.fillRect(0,0,resolution, resolution);
+        context.drawImage(image,0,0,resolution,resolution);
+        var imageData = context.getImageData(0,0, resolution,resolution);
         
         return imageData;
     }
-    
-    
-    ////////////////////////////////////////////////////////////
-    //initialize three.js
-    /////////////////////////////////////////////////////////
-    function init(){
-        
-        //CAMERA
-        camera = new THREE.PerspectiveCamera(45, SCREEN_WIDTH/SCREEN_HEIGHT, 1, 10000);
-        camera.position.set(1000, 1000, 3000);
-        
-        //SCENE
-        scene = new THREE.Scene();
-        
-        //LIGHT
-        light = new THREE.DirectionalLight(0xffffff);
-        light.position.set(0.5, 0.5, -1);
-        scene.add(light);
-        
-        pointLight = new THREE.PointLight( 0xff3300 );
-		pointLight.position.set( 0, 0, 100 );
-		scene.add( pointLight );
-		
-		ambientLight = new THREE.AmbientLight( 0x0f0f0f );
-		scene.add( ambientLight );
-        
-        //MATERIALS
-        current_material = "colors";
-        materials = generateMaterials();
-        
-        
-        //volumeDataToGeometory
-        //マーチングキューブといっていいのかわからない。たぶん違う。
-        volToGeometory = new THREE.VolumeDataToGeometory(resolution, new THREE.MeshLambertMaterial({color: 0x0000aa}));//,side:THREE.DoubleSide
-        volToGeometory.position.set(0,0,0);
-        volToGeometory.scale.set(700, 700, 700);
-        
-        
-        //MARCHING CUBES
-        //空間の分割数、マテリアル、テクスチャ、カラー、CCW
-        // effect = new THREE.MarchingCubes( resolution, materials[ current_material ].m, true, true , true);
-        // effect.position.set(0,0,0);
-        // effect.scale.set(700, 700, 700);
-        
-        // effect.enableUvs = true;
-        // effect.enableColors = true;
-        
-        //  scene.add(effect);
-        //  effect.init(resolution);
-        //updateModel(effect);
-        
-        //RENDERER
-        
-        renderer = new THREE.WebGLRenderer();
-    	renderer.setClearColor(0x4f8080);
-    	renderer.setPixelRatio(window.devicePixelRatio);
-    	renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
-    	//document.body.appendChild( renderer.domElement );
-        
-        renderer.domElement.style.position = "absolute";
-        renderer.domElement.style.top = MARGIN + "px";
-        renderer.domElement.style.left = "0px";
-        
-        container = document.getElementById( 'container' );
-        container.appendChild( renderer.domElement );
-
-        //CONTROLS
-        controls = new THREE.OrbitControls(camera, renderer.domElement);
-        
-        //STATS
-        stats = new Stats();
-        //document.appendChild(stats.dom);
-        
-        // COMPOSER
-        renderer.autoClear = false;
-        
-        var renderTargetParameters = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat, stencilBuffer: false };
-		var renderTarget = new THREE.WebGLRenderTarget( SCREEN_WIDTH, SCREEN_HEIGHT, renderTargetParameters );
-
-		effectFXAA = new THREE.ShaderPass( THREE.FXAAShader );
-
-		hblur = new THREE.ShaderPass( THREE.HorizontalTiltShiftShader );
-		vblur = new THREE.ShaderPass( THREE.VerticalTiltShiftShader );
-
-		var bluriness = 8;
-
-		hblur.uniforms[ 'h' ].value = bluriness / SCREEN_WIDTH;
-		vblur.uniforms[ 'v' ].value = bluriness / SCREEN_HEIGHT;
-
-		hblur.uniforms[ 'r' ].value = vblur.uniforms[ 'r' ].value = 0.5;
-
-		effectFXAA.uniforms[ 'resolution' ].value.set( 1 / SCREEN_WIDTH, 1 / SCREEN_HEIGHT );
-
-		composer = new THREE.EffectComposer( renderer, renderTarget );
-
-		var renderModel = new THREE.RenderPass( scene, camera );
-
-		vblur.renderToScreen = true;
-		//effectFXAA.renderToScreen = true;
-
-		composer = new THREE.EffectComposer( renderer, renderTarget );
-
-		composer.addPass( renderModel );
-
-		composer.addPass( effectFXAA );
-
-		composer.addPass( hblur );
-		composer.addPass( vblur );
-        
-        
-        // GUI
-		setupGui();
-        
-        
-        //EVENT
-        window.addEventListener('click', onWindowClick, false);
-        window.addEventListener( 'resize', onWindowResize, false );
-        
-        //export obj data
-        exportButton = document.getElementById( 'export' );
-		exportButton.addEventListener( 'click', function() { exportToObj(); });
-    	floatingDiv = document.createElement( 'div' );
-		floatingDiv.className = 'floating';
-		document.body.appendChild( floatingDiv );
-		
-		//モデルをシーンに追加
-	    scene.add(volToGeometory);
-        volToGeometory.init(resolution);
-        updateModel(volToGeometory);
-        
-    }
-
-    
-    ///////////////////////////////////////////////////////////////
-    //export current model data to obj file
-    ////////////////////////////////////////////////////////////////
-    function exportToObj() {
-        console.log("export!");
-        //clear scene
-        for( var i = 0; i < scene.children.length; i++ ) {
-			var current = scene.children[ i ];
-			if( current instanceof THREE.Mesh ) {
-				current.geometry.dispose();
-				scene.remove( current );
-				i--;
-			}
-		}
-		//add mesh
-        var geo = volToGeometory.generateGeometry();
-        var mesh = new THREE.Mesh(geo, materials[current_material]);
-        scene.add(mesh);
-        //export obj file
-    	var exporter = new THREE.OBJExporter();
-    	var result = exporter.parse( scene );
-    	floatingDiv.style.display = 'block';
-    	floatingDiv.innerHTML = result.split( '\n' ).join ( '<br />' );
-    }
-    
-    //////////////////////////////////////////////
-    //ウィンドウをクリックしたときに呼ばれる
-    //////////////////////////////////////////////
-    function onWindowClick( event ) {
-
-				var needToClose = true;
-				var target = event.target;
-
-				while( target !== null ) {
-
-					if ( target === floatingDiv || target === exportButton ) {
-
-						needToClose = false;
-						break;
-
-					}
-
-					target = target.parentElement;
-
-				}
-
-				if ( needToClose ) {
-
-					floatingDiv.style.display = 'none';
-
-				}
-
-	}
-			
-    //////////////////////////////////////////////////////////
-    //ウィンドウのサイズが変わったときに呼ばれる
-    //////////////////////////////////////////////////////////
-	function onWindowResize() {
-        SCREEN_WIDTH = window.innerWidth;
-		SCREEN_HEIGHT = window.innerHeight - 2 * MARGIN;
-		
-		camera.aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
-		camera.updateProjectionMatrix();
-		
-		renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
-		composer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
-
-		hblur.uniforms[ 'h' ].value = 4 / SCREEN_WIDTH;
-		vblur.uniforms[ 'v' ].value = 4 / SCREEN_HEIGHT;
-
-		effectFXAA.uniforms[ 'resolution' ].value.set( 1 / SCREEN_WIDTH, 1 / SCREEN_HEIGHT );
-	}
-	
-    ////////////////////////////////////////////////////////////////////////
-    //アニメーション　コールバックされる。
-    /////////////////////////////////////////////////////////////////////////
-    function animate(){
-        requestAnimationFrame(animate);
-        render();
-        stats.update()
-    }
-    
-    /////////////////////////////////////////////////////////////////////////
-    //描画処理
-    /////////////////////////////////////////////////////////////////////////
-    function render(){
-        var delta = clock.getDelta();
-        time += delta * effectController.speed * 0.5;
-        controls.update(delta);
-        
-        
-        //lights
-        light.position.set( effectController.lx, effectController.ly, effectController.lz );
-		light.position.normalize();
-		pointLight.color.setHSL( effectController.lhue, effectController.lsaturation, effectController.llightness );
-		
-        // render
-        
-        if ( effectController.postprocessing ){
-            composer.render(delta);
-        } else {
-            renderer.clear();
-            renderer.render(scene, camera);
-        }
-    }
-    
-    ///////////////////////////////////////////////////////////////////////
-    //マテリアルの生成
-    ///////////////////////////////////////////////////////////////////////////
-    function generateMaterials(){
-        var texture = new THREE.TextureLoader().load( "mario_image/front.png" );
-        //var texture = new THREE.TextureLoader().load( "textures/UV_Grid_Sm.jpg" );
-		texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-		
-		// environment map
-		var path = "textures/cube/SwedishRoyalCastle/";
-		var format = '.jpg';
-		var urls = [
-			path + 'px' + format, path + 'nx' + format,
-			path + 'py' + format, path + 'ny' + format,
-			path + 'pz' + format, path + 'nz' + format
-		];
-// 		var urls = [
-// 		    path + 'left' + format,path + 'right' + format,
-// 		    path + 'top' + format,path + 'bottom' + format,
-// 		    path + 'front' + format,path + 'back' + format
-// 		    ];
-		var cubeTextureLoader = new THREE.CubeTextureLoader();
-		
-		var reflectionCube = cubeTextureLoader.load( urls );
-		reflectionCube.format = THREE.RGBFormat;
-		reflectionCube.mapping = THREE.CubeRefractionMapping;
-		
-        var materials = {
-            "textured" :
-		    {
-			m: new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0x111111, shininess: 1, map: texture } ),//, 
-			h: 0, s: 0, l: 1
-		    },
-            "shiny"  :
-		    {
-			m: new THREE.MeshStandardMaterial( { color: 0x550000, envMap: reflectionCube, roughness: 0.0, metalness: 0.0 } ),
-			h: 0, s: 0.8, l: 0.2
-		    },
-			"colors" :
-		    {
-			m: new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0xffffff, shininess: 2, vertexColors: THREE.VertexColors} ),
-			h: 0, s: 0, l: 1
-		    },
-        };
-        
-        return materials;
-    }
-
-    function lerp(a,b,t){
-        return a * (1-t) + b * t;
-    }
-    ///////////////////////////////////////////////////////////////////////
-    //this controls content of marching cubes voxel field
-    ///////////////////////////////////////////////////////////////////////
-    function updateModel(object)
+    else 
     {
-        object.reset();
-    
-        var morph = effectController.morph;
-        var czy, cz, idx;
-        //三つの密度データを合わせた密度データを生成する
-        for(var z = 0; z < resolution; ++z){
-            cz = z * resolution * resolution;
-            for(var y = 0; y < resolution; ++y){
-                czy = cz + y * resolution;
-                for(var x = 0; x < resolution; ++x){
-                    idx = czy + x;
-                    volumeData[idx] = lerp(volumeData0[idx], volumeData1[idx], morph);
-                }
+        //volumeデータ１辺のサイズが入力画像のサイズより小さい場合
+        //fillRectを使用した画像のリサイズを行う
+        //drawImageによるリサイズよりかなりきれいになる
+        canvas.width = imgW;
+        canvas.height = imgH;
+        
+        //黒で塗りつぶしてから画像を貼る
+        context.fillStyle = "rgb(0,0,0)";
+        context.fillRect(0,0,imgW,imgH);
+        context.drawImage(image,0,0,imgW,imgH);
+        
+        var imageData = context.getImageData(0,0, imgW, imgH);
+        
+        //canvas後始末
+        canvas.width = resolution;
+        canvas.height = resolution;
+        context.fillStyle = "rgb(0,0,0)";
+        context.fillRect(0,0,resolution,resolution);
+        
+        //imageDataをresolution*resolutionにリサイズする
+        var cellsize = resolution/imgW;
+        var src = imageData.data;
+        
+        for(var i = 0; i < imgH; ++i){
+            for(var j = 0; j < imgW; ++j){
+                var idx = (i*imgW + j)*4;
+                context.fillStyle = "rgb(" + src[idx] + "," + src[idx+1] +"," + src[idx+2] + ")";
+                context.fillRect(j*cellsize, i*cellsize,cellsize,cellsize);        
             }
         }
-        object.update(volumeData);
-        //console.log("name" + object);
+        
+        var dstImageData = context.getImageData(0,0,resolution,resolution);
+        
+        //canvas後始末
+        context.clearRect(0,0,resolution,resolution);
+        canvas.width  = 0;
+        canvas.height = 0;
+        
+        return dstImageData;
     }
-    
-    ///////////////////////////////////////////////////////////////////////
-    //2枚の画像データから密度データを生成する
-    ///////////////////////////////////////////////////////////////////////
-    function createVolumeDataFrom2ImgData(imgData0, imgData1, rotateFlag){
-        
-        var width = imgData0.width;
-        var height = imgData0.height;//image height
-        var zMax = width;
-        var sArrays = [];//signed distance Arrayの配列
-        
-        sArrays[0] = createSignedDistArrayFromImageData(imgData0);
-        sArrays[1] = createSignedDistArrayFromImageData(imgData1);
-        
-        
-        var volumeData = new Float32Array(resolution*resolution*resolution);
-        
-        //signedDistArrayからボリュームデータを作成
-        getVolumeDataFrom2Img(resolution, resolution, resolution, sArrays[0], sArrays[1], volumeData, rotateFlag);
-        
-        return volumeData;
-    }
-    
-    function createSignedDistArrayFromImageData(srcImgData){
-        var width = srcImgData.width;//image width
-        var height = srcImgData.height;//image height
-        var zMax = width;
-        
-        var srcImage = srcImgData;
-        var dstImage = context.createImageData(width, height);
-        
-        var laplacianImage = context.createImageData(width, height);
-        
-        var binArray = [];
-        var negativeArray = [];
-        var coutourPosArray = [];
-        var signedDistArray = new Float32Array(width * height);//float32 array
-        var volumeData = new Float32Array(width * height * zMax);
-        
-        //image process
-        binarizationFilter(srcImage, binArray, 1);
-        negativeFilter(binArray, negativeArray, width, height);
-        Laplacian(negativeArray, laplacianImage);
-        getContourPosArray(laplacianImage, coutourPosArray);
-        
-        getSignedDistImage(coutourPosArray, binArray, dstImage, signedDistArray); 
-        return signedDistArray;
-    }
+}
 
-    ///////////////////////////////////////////////////////////
-    //guiの初期化
-    ///////////////////////////////////////////////////////////
-    function setupGui() {
-		var createHandler = function( id ) {
-			return function() {
-				var mat_old = materials[ current_material ];
-				mat_old.h = m_h.getValue();
-				mat_old.s = m_s.getValue();
-				mat_old.l = m_l.getValue();
-				current_material = id;
-				var mat = materials[ id ];
-				volToGeometory.material = mat.m;
-				m_h.setValue( mat.h );
-				m_s.setValue( mat.s );
-				m_l.setValue( mat.l );
-				// if ( current_material === "textured" ) {
-				// 	effect.enableUvs = true;
-				// } else {
-				// 	effect.enableUvs = false;
-				// }
-				// if ( current_material === "colors" ) {
-				// 	effect.enableColors = true;
-				// } else {
-				// 	effect.enableColors = false;
-				// }
-			};
-		};
-		
-		effectController = {
-		morph: 0.0,
-		material: "shiny",
-		speed: 1.0,
-		numBlobs: 10,
-		//resolution: 28,
-		isolation: 80,
-		floor: true,
-		wallx: false,
-		wallz: false,
-		hue: 0.0,
-		saturation: 0.8,
-		lightness: 0.1,
-		lhue: 0.04,
-		lsaturation: 1.0,
-		llightness: 0.5,
-		lx: 0.5,
-		ly: 0.5,
-		lz: 1.0,
-		postprocessing: false,
-		changemorph: false,
-		dummy: function() {},
-		};
-		
-		var h, m_h, m_s, m_l;
-		
-		var gui = new dat.GUI();
-		gui.addFolder("dummy");
-		
-		// material (type)
-		h = gui.addFolder( "Materials" );
-		for ( var m in materials ) {
-			effectController[ m ] = createHandler( m );
-			h.add( effectController, m ).name( m );
+
+
+///////////////////////////////////////////////////////////////
+//export current model data to obj file
+////////////////////////////////////////////////////////////////
+function exportToObj() {
+    //clear scene
+    for( var i = 0; i < scene.children.length; i++ ) {
+		var current = scene.children[ i ];
+		if( current instanceof THREE.Mesh ) {
+			current.geometry.dispose();
+			scene.remove( current );
+			i--;
 		}
-		// material (color)
-		h = gui.addFolder( "Material color" );
-		m_h = h.add( effectController, "hue", 0.0, 1.0, 0.025 );
-		m_s = h.add( effectController, "saturation", 0.0, 1.0, 0.025 );
-		m_l = h.add( effectController, "lightness", 0.0, 1.0, 0.025 );
-		// light (point)
-		h = gui.addFolder( "Point light color" );
-		h.add( effectController, "lhue", 0.0, 1.0, 0.025 ).name("hue");
-		h.add( effectController, "lsaturation", 0.0, 1.0, 0.025 ).name("saturation");
-		h.add( effectController, "llightness", 0.0, 1.0, 0.025 ).name("lightness");
-		// light (directional)
-		h = gui.addFolder( "Directional light orientation" );
-		h.add( effectController, "lx", -1.0, 1.0, 0.025 ).name("x");
-		h.add( effectController, "ly", -1.0, 1.0, 0.025 ).name("y");
-		h.add( effectController, "lz", -1.0, 1.0, 0.025 ).name("z");
-		// simulation
-		
-		// rendering
-		h = gui.addFolder( "Rendering" );
-		h.add( effectController, "postprocessing" );
-		
-		h = gui.addFolder( "Morphing" );
-		
-		effectController[ "changemorph" ] = function() {
-		    updateModel(volToGeometory);
-		};//handler
-		
-		h.add( effectController , "morph",0.0, 1.0, 0.0).name("morph");
-		h.add( effectController , "changemorph").name("update morph");
 	}
+	//add mesh
+    var geo = volToGeometory.generateGeometry();
+    var mesh = new THREE.Mesh(geo, materials[current_material]);
+    scene.add(mesh);
+    //export obj file
+	var exporter = new THREE.OBJExporter();
+	var result = exporter.parse( scene );
+	//floatingDiv.style.display = 'block';
+	//floatingDiv.innerHTML = ;
 	
+	var obj_filename = document.getElementById("obj-filename");
+	
+	var blob = new Blob([result], {type: "text/plain;charset=utf-8"});
+    saveAs(blob, (obj_filename.value || obj_filename.placeholder)+".obj");
+}
 
+//////////////////////////////////////////////
+//ウィンドウをクリックしたときに呼ばれる
+//////////////////////////////////////////////
+function onWindowClick( event ) {
+
+			var needToClose = true;
+			var target = event.target;
+
+			while( target !== null ) {
+
+				if ( target === floatingDiv || target === exportButton ) {
+
+					needToClose = false;
+					break;
+
+				}
+
+				target = target.parentElement;
+
+			}
+
+			if ( needToClose ) {
+
+				floatingDiv.style.display = 'none';
+
+			}
+
+}
+		
+//////////////////////////////////////////////////////////
+//ウィンドウのサイズが変わったときに呼ばれる
+//////////////////////////////////////////////////////////
+function onWindowResize() {
+    SCREEN_WIDTH = window.innerWidth;
+	SCREEN_HEIGHT = window.innerHeight - 2 * MARGIN;
+	
+	camera.aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
+	camera.updateProjectionMatrix();
+	
+	renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
+	composer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
+
+	hblur.uniforms[ 'h' ].value = 4 / SCREEN_WIDTH;
+	vblur.uniforms[ 'v' ].value = 4 / SCREEN_HEIGHT;
+
+	effectFXAA.uniforms[ 'resolution' ].value.set( 1 / SCREEN_WIDTH, 1 / SCREEN_HEIGHT );
+}
+
+////////////////////////////////////////////////////////////////////////
+//アニメーション　コールバックされる。
+/////////////////////////////////////////////////////////////////////////
+function animate(){
+    requestAnimationFrame(animate);
+    render();
+    stats.update()
+}
+
+/////////////////////////////////////////////////////////////////////////
+//描画処理
+/////////////////////////////////////////////////////////////////////////
+function render(){
+    
+    //update
+    var delta = clock.getDelta();
+
+    time += delta * effectController.speed * 0.5;
+    controls.update(delta);
+    
+    if(morphState.isplaying){
+        morphController.morph += delta * morphController.speed;
+        morphController.morph = (morphController.morph > 1.0) ? 0.0 : 
+                                (morphController.morph < 0.0 ) ? 1.0 : morphController.morph;
+        if(volToGeometory.visible){            
+            updateModel(volToGeometory);
+        }
+        else updateMC(effect);
+    }
+    
+    //update shader
+    shader_uniforms.morph.value = morphController.morph;
+    shader_uniforms.imageScale.value = effectController.cubeImageScale;
+    shader_uniforms.uCubeScale.value.set(effectController.cubeWScale, effectController.cubeHScale);
+    
+    //material
+    var mesh = effect.visible ? effect : volToGeometory;
+    
+    if(mesh.material instanceof THREE.ShaderMaterial){
+        shader_uniforms.uColor.value.setHSL(effectController.hue, effectController.saturation, effectController.lightness);
+    }else{
+        mesh.material.color.setHSL( effectController.hue, effectController.saturation, effectController.lightness );
+    }
+    
+    
+    
+    //lights
+    light.position.set( effectController.lx, effectController.ly, effectController.lz );
+	light.position.normalize();
+	pointLight.color.setHSL( effectController.lhue, effectController.lsaturation, effectController.llightness );
+	
+	//material
+	
+    // render
+    if ( effectController.postprocessing ){
+        composer.render(delta);
+    } else {
+        renderer.clear();
+        renderer.render(scene, camera);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////
+//マテリアルの生成
+///////////////////////////////////////////////////////////////////////////
+function generateMaterials(){
+   
+	// environment map
+	var path = "textures/cube/SwedishRoyalCastle/";
+	var format = '.jpg';
+	var urls = [
+		path + 'px' + format, path + 'nx' + format,
+		path + 'py' + format, path + 'ny' + format,
+		path + 'pz' + format, path + 'nz' + format
+	];
+
+	var cubeTextureLoader = new THREE.CubeTextureLoader();
+	
+	var reflectionCube = cubeTextureLoader.load( urls );
+	reflectionCube.format = THREE.RGBFormat;
+	reflectionCube.mapping = THREE.CubeRefractionMapping;
+	
+    var materials = {
+        "shiny"  :
+	    {
+		m: new THREE.MeshStandardMaterial( { color: 0x550000, envMap: reflectionCube, roughness: 0.0, metalness: 0.0 } ),
+		h: 0, s: 0.8, l: 0.2
+	    },
+		"colors" :
+	    {
+		m: new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0xffffff, shininess: 2, vertexColors: THREE.VertexColors} ),
+		h: 0, s: 0, l: 1
+	    },
+	    //この方法だとshader materialだけうまく動作しない。原因わからない
+	   // "cubeMap" :
+	   // {
+	   // m: new THREE.ShaderMaterial({ vertexShader: document.getElementById("vshader").textContent, fragmentShader: document.getElementById("fshader").textContent})
+	   // }
+	   "cubeMap" :
+	   {
+	       m:null,
+	       h:0,s:0,l:1
+	   }
+    };
+    
+    return materials;
+}
+
+/////////////////////////////////////////////////////////////
+//liner interpolation
+/////////////////////////////////////////////////////////////
+function lerp(a,b,t){
+    return a * (1-t) + b * t;
+}
+
+function lerpBinaryColor(c0, c1, t){
+    var carray0 = binaryColorToArray(c0);
+    var carray1 = binaryColorToArray(c1);
+    var carray = [lerp(carray0[0],carray1[0],t),lerp(carray0[1],carray1[1],t),lerp(carray0[2],carray1[2],t),];
+    return colorArrayToBinary(carray);
+}
+
+///////////////////////////////////////////////////////////////////////
+//this controls content of marching cubes voxel field
+///////////////////////////////////////////////////////////////////////
+function updateModel(object)
+{
+    object.reset();
+
+    var morph = morphController.morph;
+    var czy, cz, idx;
+    //三つの密度データを合わせた密度データを生成する
+    for(var z = 0; z < resolution; ++z){
+        cz = z * resolution * resolution;
+        for(var y = 0; y < resolution; ++y){
+            czy = cz + y * resolution;
+            for(var x = 0; x < resolution; ++x){
+                idx = czy + x;
+                volumeData[idx] = lerp(volumeData0[idx], volumeData1[idx], morph);
+                colorData[idx] = lerpBinaryColor(colorData0[idx], colorData1[idx], morph);
+            }
+        }
+    }
+    object.update(volumeData, colorData);
+}
+
+///////////////////////////////////////////////////////////////////////////
+//マーチングキューブオブジェクトを更新
+///////////////////////////////////////////////////////////////////////////
+function updateMC(object){
+    object.reset();
+    var morph = morphController.morph;
+    var czy, cz, idx;
+    //三つの密度データを合わせた密度データを生成する
+    for(var z = 0; z < resolution; ++z){
+        cz = z * resolution * resolution;
+        for(var y = 0; y < resolution; ++y){
+            czy = cz + y * resolution;
+            for(var x = 0; x < resolution; ++x){
+                idx = czy + x;
+                volumeData[idx] = lerp(volumeData0[idx], volumeData1[idx], morph);
+                colorData[idx] = lerpBinaryColor(colorData0[idx], colorData1[idx], morph);
+            }
+        }
+    }
+    object.addExtrusionObject(volumeData,resolution,resolution,resolution,colorData);
+}
+
+///////////////////////////////////////////////////////////////////////
+//2枚の画像データから密度データを生成する
+///////////////////////////////////////////////////////////////////////
+function createVolumeDataFrom2ImgData(imgData0, imgData1, rotateFlag){
+    
+    var width = imgData0.width;
+    var height = imgData0.height;//image height
+    var zMax = width;
+    var sArrays = [];//signed distance Arrayの配列
+    
+    sArrays[0] = createSignedDistArrayFromImageData(imgData0);
+    sArrays[1] = createSignedDistArrayFromImageData(imgData1);
+    
+    
+    var volumeData = new Float32Array(resolution*resolution*resolution);
+    
+    //signedDistArrayからボリュームデータを作成
+    getVolumeDataFrom2Img(resolution, resolution, resolution, sArrays[0], sArrays[1], volumeData, rotateFlag);
+    
+    return volumeData;
+}
+
+function createSignedDistArrayFromImageData(srcImgData){
+    var width = srcImgData.width;//image width
+    var height = srcImgData.height;//image height
+    var zMax = width;
+    
+    var srcImage = srcImgData;
+    var dstImage = context.createImageData(width, height);
+    
+    var laplacianImage = context.createImageData(width, height);
+    
+    var binArray = [];
+    var negativeArray = [];
+    var coutourPosArray = [];
+    var signedDistArray = new Float32Array(width * height);//float32 array
+    var volumeData = new Float32Array(width * height * zMax);
+    
+    //image process
+    binarizationFilter(srcImage, binArray, 1);
+    negativeFilter(binArray, negativeArray, width, height);
+    Laplacian(negativeArray, laplacianImage);
+    getContourPosArray(laplacianImage, coutourPosArray);
+    
+    getSignedDistImage(coutourPosArray, binArray, dstImage, signedDistArray); 
+    return signedDistArray;
 }
 
 ///////////////////////////////////////////////////////////
-//Marching cubes algorithmで使う値を返す
-//signedDist, zは0.0 ~ 1.0, zMaxは1
+//guiの初期化
 ///////////////////////////////////////////////////////////
-// getExtrusionFunction = function(signedDist,z,zMax){
-//     return Math.min(Math.min(signedDist, z), zMax-z);
-// }
+function setupGui() {
+	var createHandler = function( id ) {
+		return function() {
+			var mat_old = materials[ current_material ];
+			mat_old.h = m_h.getValue();
+			mat_old.s = m_s.getValue();
+			mat_old.l = m_l.getValue();
+			current_material = id;
+			var mat = materials[ id ];
+			
+			volToGeometory.material = mat.m;
+			effect.material = mat.m;
+			
+			m_h.setValue( mat.h );
+			m_s.setValue( mat.s );
+			m_l.setValue( mat.l );
+			
+			if ( current_material === "textured" ) {
+				effect.enableUvs = true;
+			} else {
+				effect.enableUvs = false;
+			}
+			if ( current_material === "colors" ) {
+				effect.enableColors = true;
+			} else {
+				effect.enableColors = false;
+			}
+		};
+	};
+	
+	effectController = {
+	material: "shiny",
+	speed: 1.0,
+	numBlobs: 10,
+	//resolution: 28,
+	isolation: 80,
+	floor: true,
+	wallx: false,
+	wallz: false,
+	hue: 0,
+	saturation: 0.0,
+	lightness: 0.7,
+	lhue: 0.04,
+	lsaturation: 0.0,
+	llightness: 0.4,
+	lx: 0.5,
+	ly: 0.5,
+	lz: 1.0,
+	cubeWScale:1,
+	cubeHScale:1,
+	postprocessing: false,
+	useMC:function(){effect.visible = !effect.visible; volToGeometory.visible = !volToGeometory.visible;},//MCアルゴリズムを使用するかどうかのフラグ
+	cubeImageScale: 0,
+	};
+	
+	var h, m_h, m_s, m_l;
+	
+	var gui = new dat.GUI();
+	
+	//change polygonize algorithm
+	h = gui.addFolder("MARCHING CUBE");
+	h.add(effectController, "useMC");
+	
+	// material (type)
+	h = gui.addFolder( "Materials" );
+	for ( var m in materials ) {
+		effectController[ m ] = createHandler( m );
+		h.add( effectController, m ).name( m );
+	}
+	h.add(effectController, "cubeImageScale", 0.0, 400, 0.0).name("CubeMap image scale");
+	h.add(effectController, "cubeWScale", 1, 3, 1).name("Cube width scale");
+	h.add(effectController, "cubeHScale", 1, 3, 1).name("Cube height scale");
+	
+	// material (color)
+	h = gui.addFolder( "Material color" );
+	m_h = h.add( effectController, "hue", 0.0, 1.0, 0.025 );
+	m_s = h.add( effectController, "saturation", 0.0, 1.0, 0.025 );
+	m_l = h.add( effectController, "lightness", 0.0, 1.0, 0.025 );
+	
+	// light (point)
+	h = gui.addFolder( "Point light color" );
+	h.add( effectController, "lhue", 0.0, 1.0, 0.025 ).name("hue");
+	h.add( effectController, "lsaturation", 0.0, 1.0, 0.025 ).name("saturation");
+	h.add( effectController, "llightness", 0.0, 1.0, 0.025 ).name("lightness");
+	// light (directional)
+	h = gui.addFolder( "Directional light orientation" );
+	h.add( effectController, "lx", -1.0, 1.0, 0.025 ).name("x");
+	h.add( effectController, "ly", -1.0, 1.0, 0.025 ).name("y");
+	h.add( effectController, "lz", -1.0, 1.0, 0.025 ).name("z");
+	// simulation
+	
+	// rendering
+	h = gui.addFolder( "Rendering" );
+	h.add( effectController, "postprocessing" );
+	
+	//morph
+	morphController = {
+	    isplaying:false,
+	    play: function(){ morphState.isplaying = true;},
+	    stop: function(){ morphState.isplaying = false;},
+	    changemorph: function(){
+	        if(volToGeometory.visible)updateModel(volToGeometory);
+	        else updateMC(effect);
+	    },
+	    morph: 0.0,
+	    speed: 0.5,
+	};
+	h = gui.addFolder( "Morphing" );
+	
+	h.add( morphController , "morph",0.0, 1.0, 0.0).name("morph").listen();
+	h.add( morphController , "speed",-1, 1.0, 0.5);
+	h.add( morphController , "changemorph").name("update morph");
+	h.add( morphController , "play");
+	h.add( morphController , "stop");
+}
+
+//////////////////////////////////////////
+//追加したエレメントを全て削除する
+//////////////////////////////////////////
+function endProcess(){
+    //delete container children
+    var element = document.getElementById("container");
+    removeChildren(element);
+    
+    //delete gui 
+    var elements = document.getElementsByClassName("dg main a");
+    console.log(elements);
+    for(var i = 0; i < elements.length; ++i){
+        elements[i].parentNode.removeChild(elements[i]);
+    }
+    
+    //remove listerner
+    exportButton.addEventListener( 'click', exportToObj, false);
+}
+
+function removeChildren(element){
+    while (element.firstChild) element.removeChild(element.firstChild);
+}
+
+///////////////////////////////////////////////////////////
+//frontとbackのsigneddistanceを合成する, zは0.0 ~ 1.0, zMaxは1
+///////////////////////////////////////////////////////////
 getExtrusionFunction = function(sf, sb, z,zMax){
-    var sd = (zMax - z) * sf + sb*z;
+    var sd = (zMax - z)/zMax * sf + sb*z/zMax;
     return Math.min(zMax - z, Math.min(sd, z));
 }
 

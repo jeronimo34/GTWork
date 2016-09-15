@@ -85,7 +85,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 	};
 
-	this.VIntX = function( q, pout, nout, cout, offset, isol, x, y, z, valp1, valp2 ) {
+	this.VIntX = function( q, pout, nout, offset, isol, x, y, z, valp1, valp2 ) {
 
 		var mu = ( isol - valp1 ) / ( valp2 - valp1 ),
 		nc = this.normal_cache;
@@ -98,13 +98,9 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 		nout[ offset + 1 ] = this.lerp( nc[ q + 1 ], nc[ q + 4 ], mu );
 		nout[ offset + 2 ] = this.lerp( nc[ q + 2 ], nc[ q + 5 ], mu );
 
-		cout[offset]     = this.colorField[q];
-		cout[offset + 1] = this.colorField[q+1];
-		cout[offset + 2] = this.colorField[q+2];
-		
 	};
 
-	this.VIntY = function( q, pout, nout, cout, offset, isol, x, y, z, valp1, valp2 ) {
+	this.VIntY = function( q, pout, nout, offset, isol, x, y, z, valp1, valp2 ) {
 
 		var mu = ( isol - valp1 ) / ( valp2 - valp1 ),
 		nc = this.normal_cache;
@@ -118,13 +114,10 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 		nout[ offset ] 	   = this.lerp( nc[ q ],     nc[ q2 ],     mu );
 		nout[ offset + 1 ] = this.lerp( nc[ q + 1 ], nc[ q2 + 1 ], mu );
 		nout[ offset + 2 ] = this.lerp( nc[ q + 2 ], nc[ q2 + 2 ], mu );
-		
-		cout[offset]     = this.colorField[q];
-		cout[offset + 1] = this.colorField[q+1];
-		cout[offset + 2] = this.colorField[q+2];
+
 	};
 
-	this.VIntZ = function( q, pout, nout, cout, offset, isol, x, y, z, valp1, valp2 ) {
+	this.VIntZ = function( q, pout, nout, offset, isol, x, y, z, valp1, valp2 ) {
 
 		var mu = ( isol - valp1 ) / ( valp2 - valp1 ),
 		nc = this.normal_cache;
@@ -138,10 +131,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 		nout[ offset ] 	   = this.lerp( nc[ q ],     nc[ q2 ],     mu );
 		nout[ offset + 1 ] = this.lerp( nc[ q + 1 ], nc[ q2 + 1 ], mu );
 		nout[ offset + 2 ] = this.lerp( nc[ q + 2 ], nc[ q2 + 2 ], mu );
-		
-		cout[offset]     = this.colorField[q];
-		cout[offset + 1] = this.colorField[q+1];
-		cout[offset + 2] = this.colorField[q+2];
+
 	};
 
 	this.compNorm = function( q ) {
@@ -207,7 +197,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( q );
 			this.compNorm( q1 );
-			this.VIntX( q * 3, this.vlist, this.nlist, this.clist, 0, isol, fx, fy, fz, field0, field1 );
+			this.VIntX( q * 3, this.vlist, this.nlist, 0, isol, fx, fy, fz, field0, field1 );
 
 		}
 
@@ -215,7 +205,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( q1 );
 			this.compNorm( q1y );
-			this.VIntY( q1 * 3, this.vlist, this.nlist, this.clist,3, isol, fx2, fy, fz, field1, field3 );
+			this.VIntY( q1 * 3, this.vlist, this.nlist, 3, isol, fx2, fy, fz, field1, field3 );
 
 		}
 
@@ -223,7 +213,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( qy );
 			this.compNorm( q1y );
-			this.VIntX( qy * 3, this.vlist, this.nlist, this.clist,6, isol, fx, fy2, fz, field2, field3 );
+			this.VIntX( qy * 3, this.vlist, this.nlist, 6, isol, fx, fy2, fz, field2, field3 );
 
 		}
 
@@ -231,7 +221,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( q );
 			this.compNorm( qy );
-			this.VIntY( q * 3, this.vlist, this.nlist, this.clist,9, isol, fx, fy, fz, field0, field2 );
+			this.VIntY( q * 3, this.vlist, this.nlist, 9, isol, fx, fy, fz, field0, field2 );
 
 		}
 
@@ -241,7 +231,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( qz );
 			this.compNorm( q1z );
-			this.VIntX( qz * 3, this.vlist, this.nlist, this.clist,12, isol, fx, fy, fz2, field4, field5 );
+			this.VIntX( qz * 3, this.vlist, this.nlist, 12, isol, fx, fy, fz2, field4, field5 );
 
 		}
 
@@ -249,7 +239,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( q1z );
 			this.compNorm( q1yz );
-			this.VIntY( q1z * 3,  this.vlist, this.nlist, this.clist,15, isol, fx2, fy, fz2, field5, field7 );
+			this.VIntY( q1z * 3,  this.vlist, this.nlist, 15, isol, fx2, fy, fz2, field5, field7 );
 
 		}
 
@@ -257,7 +247,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( qyz );
 			this.compNorm( q1yz );
-			this.VIntX( qyz * 3, this.vlist, this.nlist, this.clist,18, isol, fx, fy2, fz2, field6, field7 );
+			this.VIntX( qyz * 3, this.vlist, this.nlist, 18, isol, fx, fy2, fz2, field6, field7 );
 
 		}
 
@@ -265,7 +255,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( qz );
 			this.compNorm( qyz );
-			this.VIntY( qz * 3,  this.vlist, this.nlist, this.clist,21, isol, fx, fy, fz2, field4, field6 );
+			this.VIntY( qz * 3,  this.vlist, this.nlist, 21, isol, fx, fy, fz2, field4, field6 );
 
 		}
 
@@ -275,7 +265,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( q );
 			this.compNorm( qz );
-			this.VIntZ( q * 3, this.vlist, this.nlist, this.clist,24, isol, fx, fy, fz, field0, field4 );
+			this.VIntZ( q * 3, this.vlist, this.nlist, 24, isol, fx, fy, fz, field0, field4 );
 
 		}
 
@@ -283,7 +273,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( q1 );
 			this.compNorm( q1z );
-			this.VIntZ( q1 * 3,  this.vlist, this.nlist, this.clist,27, isol, fx2, fy,  fz, field1, field5 );
+			this.VIntZ( q1 * 3,  this.vlist, this.nlist, 27, isol, fx2, fy,  fz, field1, field5 );
 
 		}
 
@@ -291,7 +281,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( q1y );
 			this.compNorm( q1yz );
-			this.VIntZ( q1y * 3, this.vlist, this.nlist, this.clist,30, isol, fx2, fy2, fz, field3, field7 );
+			this.VIntZ( q1y * 3, this.vlist, this.nlist, 30, isol, fx2, fy2, fz, field3, field7 );
 
 		}
 
@@ -299,7 +289,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 			this.compNorm( qy );
 			this.compNorm( qyz );
-			this.VIntZ( qy * 3, this.vlist, this.nlist, this.clist,33, isol, fx,  fy2, fz, field2, field6 );
+			this.VIntZ( qy * 3, this.vlist, this.nlist, 33, isol, fx,  fy2, fz, field2, field6 );
 
 		}
 
@@ -315,7 +305,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 			o2 = o1 + 1;
 			o3 = o1 + 2;
 
-			this.posnormtriv( this.vlist, this.nlist, this.clist,
+			this.posnormtriv( this.vlist, this.nlist,
 							  3 * THREE.triTable[ o1 ],
 							  3 * THREE.triTable[ o2 ],
 							  3 * THREE.triTable[ o3 ],
@@ -334,7 +324,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 	// Immediate render mode simulator
 	/////////////////////////////////////
 
-	this.posnormtriv = function( pos, norm, colors, o1, o2, o3, renderCallback ) {
+	this.posnormtriv = function( pos, norm, o1, o2, o3, renderCallback ) {
 
 		var c = this.count * 3;
 		
@@ -396,17 +386,17 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 		if ( this.enableColors ) {
 
-			this.colorArray[ c ] 	 = colors[ o1 ];
-			this.colorArray[ c + 1 ] = colors[ o1 + 1 ];
-			this.colorArray[ c + 2 ] = colors[ o1 + 2 ];
+			this.colorArray[ c ] 	 = this.colorField[ o1 ];
+			this.colorArray[ c + 1 ] = this.colorField[ o1 + 1 ];
+			this.colorArray[ c + 2 ] = this.colorField[ o1 + 2 ];
 
-			this.colorArray[ c + 3 ] = colors[ o2 ];
-			this.colorArray[ c + 4 ] = colors[ o2 + 1 ];
-			this.colorArray[ c + 5 ] = colors[ o2 + 2 ];
+			this.colorArray[ c + 3 ] = this.colorField[ o2 ];
+			this.colorArray[ c + 4 ] = this.colorField[ o2 + 1 ];
+			this.colorArray[ c + 5 ] = this.colorField[ o2 + 2 ];
 
-			this.colorArray[ c + 6 ] = colors[ o3 ];
-			this.colorArray[ c + 7 ] = colors[ o3 + 1 ];
-			this.colorArray[ c + 8 ] = colors[ o3 + 2 ];
+			this.colorArray[ c + 6 ] = this.colorField[ o3 ];
+			this.colorArray[ c + 7 ] = this.colorField[ o3 + 1 ];
+			this.colorArray[ c + 8 ] = this.colorField[ o3 + 2 ];
 
 		}
 
