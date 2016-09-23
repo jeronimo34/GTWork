@@ -86,7 +86,7 @@
                 
                 
                 var image = new Image();
-                image.src = "./front.png";
+                image.src = "./link.png";
                 
                 image.onload = function(){
                     context.drawImage(image,0,0,image.width,image.height);
@@ -98,31 +98,31 @@
                     imagedata = context.createImageData(resolution, resolution);
                     var data = imagedata.data;
                     
-                    var scale = 20;
+                    // var scale = 20;
                     
-                    for(var i = 0; i < image.height; i++){
-                        for(var j = 0; j < image.width; ++j)
-                        {
-                            var idx = i*image.height + j;
-                            var idx2 = idx*4;
+                    // for(var i = 0; i < image.height; i++){
+                    //     for(var j = 0; j < image.width; ++j)
+                    //     {
+                    //         var idx = i*image.height + j;
+                    //         var idx2 = idx*4;
                             
-                            var left = j*scale;//256/3 = 85.3
-                            var top = i*scale;//
+                    //         var left = j*scale;//256/3 = 85.3
+                    //         var top = i*scale;//
                             
-                            if(signedArray[idx] == 0){
-                                data[idx2] = 255; 
-                                data[idx2+1] = data[idx2+2] = 255; 
-                                data[idx2+3] = 255;
-                                context.fillStyle = "#ff0000";
-                            }else{
-                                data[idx2] = data[idx2+1] = data[idx2+2] = 0;
-                                data[idx2+3] = 255;
-                                context.fillStyle = "#000000";
-                            }
+                    //         if(signedArray[idx] == 0){
+                    //             data[idx2] = 255; 
+                    //             data[idx2+1] = data[idx2+2] = 255; 
+                    //             data[idx2+3] = 255;
+                    //             context.fillStyle = "#ff0000";
+                    //         }else{
+                    //             data[idx2] = data[idx2+1] = data[idx2+2] = 0;
+                    //             data[idx2+3] = 255;
+                    //             context.fillStyle = "#000000";
+                    //         }
                             
-                            context.fillRect(left, top, scale, scale);
-                        }
-                    }
+                    //         context.fillRect(left, top, scale, scale);
+                    //     }
+                    // }
                     
                     // var newCanvas = document.createElement("canvas");
                     // newCanvas.setAttribute("width",resolution);

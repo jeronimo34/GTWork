@@ -17,15 +17,14 @@ var cube_material;
 var shader_uniforms;
 
 //MARCHING CUBES
-var resolution, numBlobs;
+var numBlobs;
 var composer, effectFXAA, hblur, vblur;
 var effect;
-
 var volToGeometory;
+var resolution = 32;
 
 //export obj data
 var exportButton, floatingDiv;
-var resolution = 32;
 
 var time = 0;
 var clock = new THREE.Clock();
@@ -195,14 +194,23 @@ function init(images0, images1){
     
     // environment map
     var cubeTextureLoader = new THREE.CubeTextureLoader();
+    var cubeTex0 = cubeTextureLoader.load([rotateImage(images0[3],90,true),rotateImage(images0[2],90),
+                                                                rotateImage(images0[4],-90),rotateImage(images0[5],-90),
+                                                                rotateImage(images0[0],0),rotateImage(images0[1],0)]);
+    cubeTex0.generateMipmaps = true;
+    cubeTex0.magFilter = THREE.NearestFilter;
+    cubeTex0.minFilter = THREE.NearestFilter;
+    
+    var cubeTex1 = cubeTextureLoader.load([rotateImage(images1[3],90,true),rotateImage(images1[2],90),
+                                                                rotateImage(images1[4],-90),rotateImage(images1[5],-90),
+                                                                rotateImage(images1[0],0),rotateImage(images1[1],0)] );
+    cubeTex1.generateMipmaps = true;
+    cubeTex1.magFilter = THREE.NearestFilter;
+    cubeTex1.minFilter = THREE.NearestFilter;
     
     shader_uniforms = {
-        "uTexCube" : { type: "t", value: cubeTextureLoader.load([rotateImage(images0[3],90,true),rotateImage(images0[2],90),
-                                                                rotateImage(images0[4],-90),rotateImage(images0[5],-90),
-                                                                rotateImage(images0[0],0),rotateImage(images0[1],0)]) },
-        "uTexCube2" : { type: "t", value: cubeTextureLoader.load([rotateImage(images1[3],90,true),rotateImage(images1[2],90),
-                                                                rotateImage(images1[4],-90),rotateImage(images1[5],-90),
-                                                                rotateImage(images1[0],0),rotateImage(images1[1],0)] )},
+        "uTexCube" : { type: "t", value: cubeTex0 },
+        "uTexCube2" : { type: "t", value: cubeTex1 },
         "uColor" : { type: "c", value: new THREE.Color(0xffffff) },                                                        
         "morph" : { type: "f", value:0.0},
         "imageScale" : {type:"f", value:0.0},
@@ -973,6 +981,9 @@ function endProcess(){
     
     //remove listerner
     exportButton.addEventListener( 'click', exportToObj, false);
+    
+    canvas.width = 0;
+    canvas.height = 0;
 }
 
 function removeChildren(element){
