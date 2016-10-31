@@ -38,13 +38,17 @@ var canvas, context;
 
 var colorData0,colorData1,colorData;
 var volumeData0,volumeData1,volumeData;
+var fbvolData0, fbvolData1, rlvolData0, rlvolData1, tbvolData0, tbvolData1;
+var volDataNotRmCell0, volDataNotRmCell1;
 
 var cubeTex;
+
+console.log("resolution : " + resolution);
 
 ///////////////////////////////////////////////////////////
 //ページがロードされた後に呼ばれる　すべてのリソースがロードされたとき
 /////////////////////////////////////////////////////////////
-function initThreeJs(images0, images1){
+function init2DSpriteToVoxel(images0, images1){
     
     //init three.js
     canvas = document.getElementById('canvas');
@@ -56,13 +60,21 @@ function initThreeJs(images0, images1){
     }
     
     colorData0 = new Float32Array( resolution * resolution * resolution);
-    volumeData0 = createVolumeData(images0,colorData0);
-    //console.log(colorData0.length);
+    volDataNotRmCell0 = new Float32Array( resolution * resolution * resolution);
+    fbvolData0 = new Float32Array( resolution * resolution * resolution);
+    rlvolData0 = new Float32Array( resolution * resolution * resolution);
+    tbvolData0 = new Float32Array( resolution * resolution * resolution);
+    volumeData0 = createVolumeData(images0,colorData0, fbvolData0, rlvolData0, tbvolData0, volDataNotRmCell0);
+    //getTestVolumeData(resolution);//
     colorData1 = new Float32Array( resolution * resolution * resolution);
-    volumeData1 = createVolumeData(images1,colorData1);
+    volDataNotRmCell1 = new Float32Array( resolution * resolution * resolution);
+    fbvolData1 = new Float32Array( resolution * resolution * resolution);
+    rlvolData1 = new Float32Array( resolution * resolution * resolution);
+    tbvolData1 = new Float32Array( resolution * resolution * resolution);
+    volumeData1 = createVolumeData(images1,colorData1, fbvolData1, rlvolData1, tbvolData1, volDataNotRmCell1);
     
     colorData  = new Float32Array( resolution * resolution * resolution);
-    volumeData = new Float32Array(resolution * resolution * resolution);
+    volumeData = new Float32Array( resolution * resolution * resolution);
     
     //initialize three.js
     init(images0, images1);
@@ -105,7 +117,7 @@ function init(images0, images1){
     materials = generateMaterials();
     
     //volumeDataToGeometory
-    //マーチングキューブといっていいのかわからない。たぶん違う。
+    //volumeDataからvoxelModelを生成する
     volToGeometory = new THREE.VolumeDataToGeometory(resolution, materials[ current_material ].m, true);//,side:THREE.DoubleSide
     volToGeometory.position.set(0,0,0);
     volToGeometory.scale.set(700, 700, 700);
@@ -164,15 +176,12 @@ function init(images0, images1){
 	composer.addPass( hblur );
 	composer.addPass( vblur );
     
-    
     // GUI
 	setupGui();
-    
     
     //EVENT
     window.addEventListener('click', onWindowClick, false);
     window.addEventListener( 'resize', onWindowResize, false );
-    
     
     //export obj data
     exportButton = document.getElementById( 'export' );
@@ -187,10 +196,12 @@ function init(images0, images1){
     scene.add(volToGeometory);
     volToGeometory.init(resolution);
     updateModel(volToGeometory);
+    volToGeometory.visible = false;
     
     scene.add(effect);
     effect.init(resolution);
-    updateMC(effect);
+    updateModel(effect);
+    volToGeometory.visible = true;
     
     // environment map
     var cubeTextureLoader = new THREE.CubeTextureLoader();
@@ -248,7 +259,6 @@ function rotateImage(image, degree, flipY){
     //translateした分戻して原点を0，0に
     context.translate( -halfW, -halfH );
     
-    
     //読み込んだimgをcanvas(c1)に貼付け
     context.drawImage(image, 0, 0);
     
@@ -257,17 +267,17 @@ function rotateImage(image, degree, flipY){
     
     return canvas.toDataURL();
 }
+
 //////////////////////////////////////////////////////////////
 //６枚の画像からボリュームデータを生成
 //////////////////////////////////////////////////////////////
-function createVolumeData(images, colorData){
+function createVolumeData(images, colorData, fbvolData, rlvolData, tbvolData, volDataNotRmCell){
     var imageNum = images.length;
     
     var volDataX = resolution;
     var volDataY = volDataX;
     var volDataZ = volDataX;
-    var rlvolData, fbvolData, tbvolData;
-    
+
     var imagesData = [];
     //ロードした画像からimageDataの配列を作成
     for(var i = 0; i < imageNum; ++i){
@@ -275,11 +285,10 @@ function createVolumeData(images, colorData){
         imagesData[i] = imageData;
     }
     
-    
     //volumeDataの作成
-    fbvolData = createVolumeDataFrom2ImgData(imagesData[0], imagesData[1],0);//front, back
-    rlvolData = createVolumeDataFrom2ImgData(imagesData[2], imagesData[3],1);//right, left
-    tbvolData = createVolumeDataFrom2ImgData(imagesData[4], imagesData[5],2);//top bottom
+    var tfbvolData = createVolumeDataFrom2ImgData(imagesData[0], imagesData[1],0);//front, back
+    var trlvolData = createVolumeDataFrom2ImgData(imagesData[2], imagesData[3],1);//right, left
+    var ttbvolData = createVolumeDataFrom2ImgData(imagesData[4], imagesData[5],2);//top bottom
     var volData = new Float32Array(resolution * resolution * resolution);
     
     //三つの密度データを合わせる
@@ -287,7 +296,11 @@ function createVolumeData(images, colorData){
         for(var y = 0; y <  volDataY; ++y){
             for(var z = 0; z < volDataZ; ++z){
                 var idx0 = x + y*volDataX + z*volDataX*volDataY;
-                volData[idx0] = Math.min(fbvolData[idx0], Math.min(rlvolData[idx0], tbvolData[idx0]));
+                volData[idx0] = Math.min(tfbvolData[idx0], Math.min(trlvolData[idx0], ttbvolData[idx0]));
+                volDataNotRmCell[idx0] = volData[idx0];
+                fbvolData[idx0] = tfbvolData[idx0];
+                rlvolData[idx0] = trlvolData[idx0];
+                tbvolData[idx0] = ttbvolData[idx0];
             }
         }
     }
@@ -466,7 +479,6 @@ function removeCell(volumeData, imagesData, colorData){
             }
         }
     }
-    console.log("repeat num = " + count);
 }
 
 function outOfRange(val, mn, mx){
@@ -477,11 +489,12 @@ function isSomeColor(color0, color1){
     return colorArrayToBinary(color0) == colorArrayToBinary(color1);
 }
 
-function isSimilarColor(color0, color1){
-    var distance = Math.pow((color0[0]-color1[0]), 2) + Math.pow((color0[1]-color1[1]), 2) + Math.pow((color0[2]-color1[2]), 2);
-    var similarValue = distance/(255*255*3);
-    return similarValue < 0.001;//0.5%以内なら似てる
-}
+// //
+// function isSimilarColor(color0, color1){
+//     var distance = Math.pow((color0[0]-color1[0]), 2) + Math.pow((color0[1]-color1[1]), 2) + Math.pow((color0[2]-color1[2]), 2);
+//     var similarValue = distance/(255*255*3);
+//     return similarValue < 0.005;//0.5%以内なら似てる
+// }
 
 /////////////////////////////////////////////////////////////
 //ロード済みの画像からimageDataを作成
@@ -521,7 +534,7 @@ function createImageData(image, imgW, imgH){
         
         var imageData = context.getImageData(0,0, imgW, imgH);
         
-        //canvas後始末
+        //canvas黒で塗りつぶし
         canvas.width = resolution;
         canvas.height = resolution;
         context.fillStyle = "rgb(0,0,0)";
@@ -549,8 +562,6 @@ function createImageData(image, imgW, imgH){
         return dstImageData;
     }
 }
-
-
 
 ///////////////////////////////////////////////////////////////
 //export current model data to obj file
@@ -629,6 +640,13 @@ function onWindowResize() {
 	effectFXAA.uniforms[ 'resolution' ].value.set( 1 / SCREEN_WIDTH, 1 / SCREEN_HEIGHT );
 }
 
+function clamp(val, mn, mx)
+{
+    if(val < mn)return mn;
+    if(val > mx)return mx;
+    return val;
+}
+
 ////////////////////////////////////////////////////////////////////////
 //アニメーション　コールバックされる。
 /////////////////////////////////////////////////////////////////////////
@@ -649,14 +667,16 @@ function render(){
     time += delta * effectController.speed * 0.5;
     controls.update(delta);
     
+    //update morph
     if(morphState.isplaying){
-        morphController.morph += delta * morphController.speed;
-        morphController.morph = (morphController.morph > 1.0) ? 0.0 : 
-                                (morphController.morph < 0.0 ) ? 1.0 : morphController.morph;
+        morphController.morph = clamp(morphController.morph + delta * morphController.speed,0,1);
+        if(morphController.morph == 1 || morphController.morph == 0)morphState.isplaying = false;
+        
+        var eff = effect;
         if(volToGeometory.visible){            
-            updateModel(volToGeometory);
+            eff = volToGeometory;
         }
-        else updateMC(effect);
+        updateModel(eff);
     }
     
     //update shader
@@ -673,14 +693,10 @@ function render(){
         mesh.material.color.setHSL( effectController.hue, effectController.saturation, effectController.lightness );
     }
     
-    
-    
     //lights
     light.position.set( effectController.lx, effectController.ly, effectController.lz );
 	light.position.normalize();
 	pointLight.color.setHSL( effectController.lhue, effectController.lsaturation, effectController.llightness );
-	
-	//material
 	
     // render
     if ( effectController.postprocessing ){
@@ -714,12 +730,12 @@ function generateMaterials(){
     var materials = {
         "shiny"  :
 	    {
-		m: new THREE.MeshStandardMaterial( { color: 0x550000, envMap: reflectionCube, roughness: 0.0, metalness: 0.0 } ),
+		m: new THREE.MeshStandardMaterial( { color: 0x550000, envMap: reflectionCube, roughness: 0.0, metalness: 0.0, /*side: THREE.DoubleSide*/ } ),
 		h: 0, s: 0.8, l: 0.2
 	    },
 		"colors" :
 	    {
-		m: new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0xffffff, shininess: 2, vertexColors: THREE.VertexColors} ),
+		m: new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0xffffff, shininess: 2, vertexColors: THREE.VertexColors, /*side: THREE.DoubleSide*/} ),
 		h: 0, s: 0, l: 1
 	    },
 	    //この方法だとshader materialだけうまく動作しない。原因わからない
@@ -727,7 +743,7 @@ function generateMaterials(){
 	   // {
 	   // m: new THREE.ShaderMaterial({ vertexShader: document.getElementById("vshader").textContent, fragmentShader: document.getElementById("fshader").textContent})
 	   // }
-	   "cubeMap" :
+	   "cubeMap" ://init関数の中で初期化している
 	   {
 	       m:null,
 	       h:0,s:0,l:1
@@ -758,6 +774,32 @@ function updateModel(object)
 {
     object.reset();
 
+    var v0 = volumeData0;
+    var v1 = volumeData1;
+    var showColor = !(effectController.showfbVolData==true || effectController.showlrVolData==true ||
+                        effectController.showtbVolData==true || effectController.showCombineVolData==true);
+    if(effectController.showfbVolData)
+    {
+        v0 = fbvolData0;
+        v1 = fbvolData1;
+    }
+    else if(effectController.showlrVolData)
+    {
+        v0 = rlvolData0;
+        v1 = rlvolData1;
+    }
+    else if(effectController.showtbVolData)
+    {
+        v0 = tbvolData0;
+        v1 = tbvolData1;
+    }
+    else if(effectController.showCombineVolData)
+    {
+        v0 = volDataNotRmCell0;
+        v1 = volDataNotRmCell1;
+    }
+    
+    
     var morph = morphController.morph;
     var czy, cz, idx;
     //三つの密度データを合わせた密度データを生成する
@@ -767,34 +809,14 @@ function updateModel(object)
             czy = cz + y * resolution;
             for(var x = 0; x < resolution; ++x){
                 idx = czy + x;
-                volumeData[idx] = lerp(volumeData0[idx], volumeData1[idx], morph);
-                colorData[idx] = lerpBinaryColor(colorData0[idx], colorData1[idx], morph);
+                volumeData[idx] = lerp(v0[idx], v1[idx], morph);
+                if(showColor)colorData[idx] = lerpBinaryColor(colorData0[idx], colorData1[idx], morph);
+                else colorData[idx] = 0;
             }
         }
     }
-    object.update(volumeData, colorData);
-}
-
-///////////////////////////////////////////////////////////////////////////
-//マーチングキューブオブジェクトを更新
-///////////////////////////////////////////////////////////////////////////
-function updateMC(object){
-    object.reset();
-    var morph = morphController.morph;
-    var czy, cz, idx;
-    //三つの密度データを合わせた密度データを生成する
-    for(var z = 0; z < resolution; ++z){
-        cz = z * resolution * resolution;
-        for(var y = 0; y < resolution; ++y){
-            czy = cz + y * resolution;
-            for(var x = 0; x < resolution; ++x){
-                idx = czy + x;
-                volumeData[idx] = lerp(volumeData0[idx], volumeData1[idx], morph);
-                colorData[idx] = lerpBinaryColor(colorData0[idx], colorData1[idx], morph);
-            }
-        }
-    }
-    object.addExtrusionObject(volumeData,resolution,resolution,resolution,colorData);
+    if(volToGeometory.visible) object.update(volumeData, colorData);//voxel modelを更新
+    else object.addExtrusionObject(volumeData, resolution, resolution, resolution, colorData);//マーチングキューブオブジェクトを更新
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -901,16 +923,71 @@ function setupGui() {
 	postprocessing: false,
 	useMC:function(){effect.visible = !effect.visible; volToGeometory.visible = !volToGeometory.visible;},//MCアルゴリズムを使用するかどうかのフラグ
 	cubeImageScale: 0,
+	showfbVolData:false,
+	showlrVolData:false,
+	showtbVolData:false,
+	showCombineVolData:false,
 	};
 	
 	var h, m_h, m_s, m_l;
 	
 	var gui = new dat.GUI();
 	
+	//show mid result flag
+	//radio button
+	h = gui.addFolder("SHOW MID RESULT");
+	var tcontroll = h.add(effectController, "showfbVolData").name("front back").listen();
+	tcontroll.onChange(function(value){
+	    if(value){
+	    effectController.showlrVolData = false;    
+	    effectController.showtbVolData = false;
+	    effectController.showCombineVolData = false;
+	    }
+	    if(volToGeometory.visible)updateModel(volToGeometory);
+	    else updateModel(effect);
+	});
+	
+	tcontroll = h.add(effectController, "showlrVolData").name("left right").listen();
+	tcontroll.onChange(function(value){
+	    if(value){
+	    effectController.showfbVolData = false;    
+	    effectController.showtbVolData = false;
+	    effectController.showCombineVolData = false;
+
+	    }
+	    	    
+	    if(volToGeometory.visible)updateModel(volToGeometory);
+	    else updateModel(effect);
+	});
+	
+	tcontroll = h.add(effectController, "showtbVolData").name("top bottom").listen();
+	tcontroll.onChange(function(value){
+	    if(value){
+	    effectController.showlrVolData = false;    
+	    effectController.showfbVolData = false;
+	    effectController.showCombineVolData = false;
+
+	    }
+	    	    
+	    if(volToGeometory.visible)updateModel(volToGeometory);
+	    else updateModel(effect);
+	});
+	
+	tcontroll = h.add(effectController, "showCombineVolData").name("combine").listen();
+	tcontroll.onChange(function(value){
+	    if(value){
+	    effectController.showfbVolData = false;    
+	    effectController.showlrVolData = false;    
+	    effectController.showtbVolData = false;
+	    }
+	    if(volToGeometory.visible)updateModel(volToGeometory);
+	    else updateModel(effect);
+	});
+	
+	
 	//change polygonize algorithm
 	h = gui.addFolder("MARCHING CUBE");
 	h.add(effectController, "useMC");
-	
 	// material (type)
 	h = gui.addFolder( "Materials" );
 	for ( var m in materials ) {
@@ -950,7 +1027,7 @@ function setupGui() {
 	    stop: function(){ morphState.isplaying = false;},
 	    changemorph: function(){
 	        if(volToGeometory.visible)updateModel(volToGeometory);
-	        else updateMC(effect);
+	        else updateModel(effect);
 	    },
 	    morph: 0.0,
 	    speed: 0.5,
@@ -974,7 +1051,7 @@ function endProcess(){
     
     //delete gui 
     var elements = document.getElementsByClassName("dg main a");
-    console.log(elements);
+    //console.log(elements);
     for(var i = 0; i < elements.length; ++i){
         elements[i].parentNode.removeChild(elements[i]);
     }
@@ -1020,11 +1097,8 @@ getVolumeDataFrom2Img = function(zMax, height, width, array0, array1, volumeData
                 
                 var idx2 = idx2Array[rotateFlag];
                 volumeData[idx] = getExtrusionFunction(sfArray[idx2], sbArray[idx2], div, 1.0);
-                    
                 }
-                
             }
-            
         }
 }
 
@@ -1052,6 +1126,26 @@ getVolumeData = function(zMax, height, width, sArrays, volumeData){
         }
 }
 
+getTestVolumeData = function(resolution)
+{
+    var volumeData = new Float32Array(resolution * resolution * resolution);
+    
+    for(var z = 0; z < resolution; ++z)
+    {
+        for(var y = 0; y < resolution; ++y)
+        {
+            for(var x = 0; x < resolution; ++x)
+            {
+                var idx = z * resolution * resolution + y * resolution + x;
+                if(x == 0)volumeData[idx] = 1.0;
+                else volumeData[idx] = 0.0;
+                
+            }
+        }
+    }
+    return volumeData;
+    
+}
 
 
 

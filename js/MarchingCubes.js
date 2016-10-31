@@ -19,7 +19,8 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 	this.init = function ( resolution ) {
 
-		this.resolution = resolution;
+		
+		this.resolution = resolution;//+20;
 
 		// parameters
 
@@ -27,7 +28,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 		// size of field, 32 is pushing it in Javascript :)
 
-		this.size = resolution;
+		this.size = this.resolution;
 		this.size2 = this.size * this.size;
 		this.size3 = this.size2 * this.size;
 		this.halfsize = this.size / 2.0;
@@ -545,50 +546,64 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 	this.addExtrusionObject = function(volumeData, 
 	                                   sizeX, sizeY, sizeZ,
 	                                   colorData){
-	                                   	
-			var x, y, z, xx, val, xdiv, cxy,ydiv, zdiv, voldata, idx,
+	    console.log("marching cube update");
+	    
+		var x, y, z, xx, val, xdiv, cxy,ydiv, zdiv, voldata, idx,
 
-			// cache attribute lookups
-			size = this.size,
-			yd = this.yd,
-			zd = this.zd,
-			field = this.field,
-			dist = size;
-	
-			var min_x = 0;
-			var max_x = this.size;
-			var min_y = 0;
-			var max_y = this.size;
-			var min_z = 0;
-			var max_z = this.size;
+		// cache attribute lookups
+		size = this.size,
+		yd = this.yd,
+		zd = this.zd,
+		field = this.field,
+		dist = size;
 
+		//this.size == resolution + 2
+		//
+		var min_x = 0;
+		var max_x = this.size;
+		var min_y = 0;
+		var max_y = this.size;
+		var min_z = 0;
+		var max_z = this.size;
+		var volsize = this.size;//-20;
+		
 		for ( x = min_x; x < max_x; x ++ ) {
-			xdiv = (x-min_x) / (max_x-min_x);
 			
-					for ( y = min_y; y < max_y; y ++ ) {
-					ydiv = 1.0 - (y - min_y) / (max_y - min_y);
-					cxy = x + y * yd;
+			xdiv = (x-min_x) / (max_x-min_x);
 					
-					for ( z = min_z; z < max_z; z ++ ) {
-						zdiv = (z-min_z) / (max_z - min_z);
-						
-						idx = z * sizeY * sizeX
-						    + (max_y-1-y) * sizeX
-						    + x;
-						
-						voldata = volumeData[idx];
-						
-						var idx2 = zd * z + cxy;
-						
-						field[ idx2 ] = -voldata;
-						var colorArray = this.binaryColorToArray(colorData[idx]);
-						var inv = 1.0/255.0;
-						this.colorField[idx2 * 3] = colorArray[0]*inv;
-						this.colorField[idx2 * 3+1] = colorArray[1]*inv;
-						this.colorField[idx2 * 3+2] = colorArray[2]*inv;
-						
-					}
+			for ( y = min_y; y < max_y; y ++ ) {
+				ydiv = 1.0 - (y - min_y) / (max_y - min_y);
+				cxy = x + y * yd;
+				
+				for ( z = min_z; z < max_z; z ++ ) {
+					
+					zdiv = (z-min_z) / (max_z - min_z);
+					
+					var idx2 = zd * z + cxy;
+					
+					var yy = y;
+					var xx = x;
+					var zz = z;
+					
+					idx = zz * volsize * volsize
+					    + (volsize-1-yy) * volsize
+					    + xx;
+					
+					/*if(x < 10 || max_x-10 < x || y < 10 || max_y-10 < y || z < 10 || max_z-10 < z)voldata = -1;
+					else */
+					
+					voldata = volumeData[idx];
+					
+					field[ idx2 ] = -voldata;
+					
+					var colorArray = this.binaryColorToArray(colorData[idx]);
+					var inv = 1.0/255.0;
+					this.colorField[idx2 * 3] = colorArray[0]*inv;
+					this.colorField[idx2 * 3+1] = colorArray[1]*inv;
+					this.colorField[idx2 * 3+2] = colorArray[2]*inv;
+					
 				}
+			}
 		}
 		
 	};
