@@ -235,12 +235,10 @@ getSignedDistImage = function(coutourPosArray, binArray, dstImage, dstArray){
      {
          if(distanceArray[i] > 0){
             distanceArray[i] /= maxDist;    
-            //distanceArray[i] = 1;    
-            
+            distanceArray[i] = 1;
          }else if(distanceArray[i] < 0){
              distanceArray[i] /= -minDist;
-             //distanceArray[i] = -1;
-             
+             distanceArray[i] = -1;
          }else distanceArray[i] = 0;
      }
 }

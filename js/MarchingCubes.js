@@ -20,11 +20,11 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 	this.init = function ( resolution ) {
 
 		
-		this.resolution = resolution;//+20;
+		this.resolution = resolution;
 
 		// parameters
 
-		this.isolation = 80.0;
+		this.isolation = 1.0;
 
 		// size of field, 32 is pushing it in Javascript :)
 
@@ -85,12 +85,13 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 		return a + ( b - a ) * t;
 
 	};
-
+	
 	this.VIntX = function( q, pout, nout, cout, offset, isol, x, y, z, valp1, valp2 ) {
 
 		var mu = ( isol - valp1 ) / ( valp2 - valp1 ),
 		nc = this.normal_cache;
-
+		var invmu = 1.0 - mu;
+		
 		pout[ offset ] 	   = x + mu * this.delta;
 		pout[ offset + 1 ] = y;
 		pout[ offset + 2 ] = z;
@@ -99,9 +100,14 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 		nout[ offset + 1 ] = this.lerp( nc[ q + 1 ], nc[ q + 4 ], mu );
 		nout[ offset + 2 ] = this.lerp( nc[ q + 2 ], nc[ q + 5 ], mu );
 
-		cout[offset]     = this.colorField[q];
-		cout[offset + 1] = this.colorField[q+1];
-		cout[offset + 2] = this.colorField[q+2];
+		/*
+		cout[offset]     = this.lerp(this.colorField[q], this.colorField[q+3], invmu);
+		cout[offset + 1] = this.lerp(this.colorField[q+1], this.colorField[q+4], invmu);
+		cout[offset + 2] = this.lerp(this.colorField[q+2], this.colorField[q+5], invmu);//this.colorField[q+2];
+		*/
+		cout[offset]     = this.lerp(this.colorField[q], this.colorField[q+3], invmu);
+		cout[offset + 1] = this.lerp(this.colorField[q+1], this.colorField[q+4], invmu);
+		cout[offset + 2] = this.lerp(this.colorField[q+2], this.colorField[q+5], invmu);//this.colorField[q+2];
 		
 	};
 
@@ -109,6 +115,8 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 
 		var mu = ( isol - valp1 ) / ( valp2 - valp1 ),
 		nc = this.normal_cache;
+		
+		var invmu = 1.0 - mu;
 
 		pout[ offset ] 	   = x;
 		pout[ offset + 1 ] = y + mu * this.delta;
@@ -119,16 +127,18 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 		nout[ offset ] 	   = this.lerp( nc[ q ],     nc[ q2 ],     mu );
 		nout[ offset + 1 ] = this.lerp( nc[ q + 1 ], nc[ q2 + 1 ], mu );
 		nout[ offset + 2 ] = this.lerp( nc[ q + 2 ], nc[ q2 + 2 ], mu );
-		
-		cout[offset]     = this.colorField[q];
-		cout[offset + 1] = this.colorField[q+1];
-		cout[offset + 2] = this.colorField[q+2];
+
+		cout[offset]     = this.lerp(this.colorField[q], this.colorField[q2], invmu);
+		cout[offset + 1] = this.lerp(this.colorField[q+1], this.colorField[q2+1], invmu);
+		cout[offset + 2] = this.lerp(this.colorField[q+2], this.colorField[q2+2], invmu);//this.colorField[q+2];
 	};
 
 	this.VIntZ = function( q, pout, nout, cout, offset, isol, x, y, z, valp1, valp2 ) {
 
 		var mu = ( isol - valp1 ) / ( valp2 - valp1 ),
 		nc = this.normal_cache;
+
+		var invmu = 1.0 - mu;
 
 		pout[ offset ] 	   = x;
 		pout[ offset + 1 ] = y;
@@ -140,9 +150,9 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 		nout[ offset + 1 ] = this.lerp( nc[ q + 1 ], nc[ q2 + 1 ], mu );
 		nout[ offset + 2 ] = this.lerp( nc[ q + 2 ], nc[ q2 + 2 ], mu );
 		
-		cout[offset]     = this.colorField[q];
-		cout[offset + 1] = this.colorField[q+1];
-		cout[offset + 2] = this.colorField[q+2];
+		cout[offset]     = this.lerp(this.colorField[q], this.colorField[q2], invmu);
+		cout[offset + 1] = this.lerp(this.colorField[q+1], this.colorField[q2+1], invmu);
+		cout[offset + 2] = this.lerp(this.colorField[q+2], this.colorField[q2+2], invmu);//this.colorField[q+2];
 	};
 
 	this.compNorm = function( q ) {
@@ -546,7 +556,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 	this.addExtrusionObject = function(volumeData, 
 	                                   sizeX, sizeY, sizeZ,
 	                                   colorData){
-	    console.log("marching cube update");
+	    //console.log("marching cube update");
 	    
 		var x, y, z, xx, val, xdiv, cxy,ydiv, zdiv, voldata, idx,
 
@@ -565,33 +575,31 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 		var max_y = this.size;
 		var min_z = 0;
 		var max_z = this.size;
-		var volsize = this.size;//-20;
+		var volsize = sizeX;//-20;
 		
 		for ( x = min_x; x < max_x; x ++ ) {
 			
-			xdiv = (x-min_x) / (max_x-min_x);
+			xdiv = (x-min_x) / (max_x-1-min_x);
 					
 			for ( y = min_y; y < max_y; y ++ ) {
-				ydiv = 1.0 - (y - min_y) / (max_y - min_y);
+				ydiv = 1.0 - (y - min_y) / (max_y-1 - min_y);
 				cxy = x + y * yd;
 				
 				for ( z = min_z; z < max_z; z ++ ) {
 					
-					zdiv = (z-min_z) / (max_z - min_z);
+					zdiv = (z-min_z) / (max_z-1 - min_z);
 					
 					var idx2 = zd * z + cxy;
 					
-					var yy = y;
-					var xx = x;
-					var zz = z;
-					
-					idx = zz * volsize * volsize
-					    + (volsize-1-yy) * volsize
-					    + xx;
-					
-					/*if(x < 10 || max_x-10 < x || y < 10 || max_y-10 < y || z < 10 || max_z-10 < z)voldata = -1;
-					else */
-					
+					/*
+					idx = z * volsize * volsize
+					    + (volsize-1-y) * volsize
+					    + x;
+					*/
+					idx = Math.floor((volsize-1) * zdiv) * volsize * volsize
+					      + Math.floor((volsize-1) * ydiv) * volsize
+					      + Math.floor((volsize-1) * xdiv);
+					      
 					voldata = volumeData[idx];
 					
 					field[ idx2 ] = -voldata;
@@ -767,7 +775,7 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 					var fx = ( x - this.halfsize ) / this.halfsize; //+ 1
 					var q = y_offset + x;
 
-					this.polygonize( fx, fy, fz, q, 0/*this.isolation*/, renderCallback );
+					this.polygonize( fx, fy, fz, q, this.isolation, renderCallback );
 
 				}
 

@@ -6,6 +6,7 @@ if(!Detector.webgl) Detector.addGetWebGLMessage();
 var MARGIN = 0;
 var SCREEN_WIDTH = window.innerWidth;
 var SCREEN_HEIGHT = window.innerHeight - 2 * MARGIN;
+var EPS = 1e-9;
 
 var container, stats;
 
@@ -21,7 +22,8 @@ var numBlobs;
 var composer, effectFXAA, hblur, vblur;
 var effect;
 var volToGeometory;
-var resolution = 32;
+var resolution = 72;//default value
+var max_resolution = 100;//default value
 
 //export obj data
 var exportButton, floatingDiv;
@@ -43,10 +45,10 @@ var volDataNotRmCell0, volDataNotRmCell1;
 
 var cubeTex;
 
-console.log("resolution : " + resolution);
 
 ///////////////////////////////////////////////////////////
 //ページがロードされた後に呼ばれる　すべてのリソースがロードされたとき
+//imageはすべて同じサイズ同じサイズかつ、正方形である必要がある
 /////////////////////////////////////////////////////////////
 function init2DSpriteToVoxel(images0, images1){
     
@@ -59,13 +61,19 @@ function init2DSpriteToVoxel(images0, images1){
         throw new Error('canvas error');
     }
     
+    //resolution = image_size * 3
+    max_resolution = images0[0].naturalWidth * 3;
+    resolution = max_resolution;
+    console.log("resolution : " + resolution);
+
+
     colorData0 = new Float32Array( resolution * resolution * resolution);
     volDataNotRmCell0 = new Float32Array( resolution * resolution * resolution);
     fbvolData0 = new Float32Array( resolution * resolution * resolution);
     rlvolData0 = new Float32Array( resolution * resolution * resolution);
     tbvolData0 = new Float32Array( resolution * resolution * resolution);
     volumeData0 = createVolumeData(images0,colorData0, fbvolData0, rlvolData0, tbvolData0, volDataNotRmCell0);
-    //getTestVolumeData(resolution);//
+    
     colorData1 = new Float32Array( resolution * resolution * resolution);
     volDataNotRmCell1 = new Float32Array( resolution * resolution * resolution);
     fbvolData1 = new Float32Array( resolution * resolution * resolution);
@@ -201,7 +209,8 @@ function init(images0, images1){
     scene.add(effect);
     effect.init(resolution);
     updateModel(effect);
-    volToGeometory.visible = true;
+    effect.visible = true;
+    //volToGeometory.visible = true;
     
     // environment map
     var cubeTextureLoader = new THREE.CubeTextureLoader();
@@ -289,7 +298,7 @@ function createVolumeData(images, colorData, fbvolData, rlvolData, tbvolData, vo
     var tfbvolData = createVolumeDataFrom2ImgData(imagesData[0], imagesData[1],0);//front, back
     var trlvolData = createVolumeDataFrom2ImgData(imagesData[2], imagesData[3],1);//right, left
     var ttbvolData = createVolumeDataFrom2ImgData(imagesData[4], imagesData[5],2);//top bottom
-    var volData = new Float32Array(resolution * resolution * resolution);
+    var volData = new Float32Array(resolution * resolution * max_resolution);
     
     //三つの密度データを合わせる
     for(var x = 0; x < volDataX; ++x){
@@ -309,10 +318,101 @@ function createVolumeData(images, colorData, fbvolData, rlvolData, tbvolData, vo
     //色情報をもとに余計な部分を消す。
     removeCell(volData, imagesData, colorData);
     
+    //recalculate 3d signed distance.
+    compute3dSignedDist(volData);
+    
     return volData;
     
 }
 
+////////////////////////////////////////////////////
+//recalculate signedDist after remove cells.
+////////////////////////////////////////////////////
+function compute3dSignedDist(volData)
+{
+    var size = max_resolution;
+    var coutourPosArray = get3dCoutourPosArray(volData);//vector3 Array
+    
+    var minDist =  1000000;//Number.MAX_VALUE;
+    var maxDist = -1000000;//Number.MAX_VALUE;
+    var sign = 0;
+    
+    console.log(maxDist + " : dist : " + minDist)
+    for(var x = 0; x < size; ++x)
+    {
+        for(var y = 0; y < size; ++y)
+        {
+            for(var z = 0; z < size; ++z)
+            {
+            var idx = z * size * size + y * size + x;
+            var value = volData[idx];
+            
+            //on the coutour.
+            if(Math.abs(value) < EPS ) continue;
+            
+            if(value > 0) sign = 1;
+            else sign = -1;
+            
+            var distance = sign;//*getShortestDistToCoutour(x,y,z, coutourPosArray);       
+            //minDist = Math.min(distance, minDist);
+	        //maxDist = Math.max(distance, maxDist);
+            volData[idx] = distance;
+            }
+        }
+        
+    }
+    //console.log("re :" + maxDist + " : dist : " + minDist)
+    //console.log(maxDist + " : dist : " + minDist)
+    //volData -1 ~ +1
+    /*
+    for(var i = 0; i < size * size * size; ++i)
+    {
+        //if(volData[i] > 0) volData[i] /= maxDist;
+        //else if(volData[i] < 0) volData[i] /= -minDist;
+    }
+    */
+}
+
+/////////////////////////////////////////
+//get coutour positions
+////////////////////////////////////////
+function get3dCoutourPosArray(volData)
+{
+    var coutourPosArray = [];
+    var size = max_resolution;
+    
+      for(var x = 0; x < size; ++x)
+    {
+        for(var y = 0; y < size; ++y)
+        {
+            for(var z = 0; z < size; ++z)
+            {
+                var idx = z * size * size + y * size + x;
+                if(Math.abs(volData[idx]) < EPS)
+                {
+                    coutourPosArray.push(new THREE.Vector3(x,y,z));
+                }
+            }
+        }
+    }
+    
+    return coutourPosArray;
+}
+
+function getShortestDistToCoutour(x,y,z, coutourPosArray)
+{
+    var shortest_dist = 1000000;//Number.MAX_VALUE;
+    var targetpos = new THREE.Vector3(x,y,z);
+    
+    for(var i = 0; i < coutourPosArray.length; ++i)
+    {
+        var c_pos = coutourPosArray[i];
+        var dist = c_pos.distanceTo(targetpos);
+        shortest_dist = Math.min(shortest_dist, dist );    
+    }
+    
+    return shortest_dist;
+}
 ///////////////////////////////////////////////////////////////////
 //色は配列かバイナリであらわされ、その相互変換を行う
 ///////////////////////////////////////////////////////////////////
@@ -328,7 +428,7 @@ function binaryColorToArray(bin)
 
 ///////////////////////////////////////////////////////////////////
 //the voxel carving procedure
-//try to use the color information to remove inconsistent cells.
+//use the color information to remove inconsistent cells.
 ///////////////////////////////////////////////////////////////////
 function removeCell(volumeData, imagesData, colorData){
     
@@ -341,29 +441,30 @@ function removeCell(volumeData, imagesData, colorData){
     
     var existsRemovableCell = true;
     var count = 0;
+    var repeat_num = 100;
+    //front, back, top, bottom, left, right
+    var dir = [[0,0,1], [0,0,-1],[0,-1,0],
+               [0,1,0],[-1,0,0],[1,0,0]];
     
-    while(existsRemovableCell){
+    while(existsRemovableCell && count < repeat_num){
         count++;    
         existsRemovableCell = false;
         
-        for(var z = 0; z < resolution; ++z)
+        for(var z = 0; z < max_resolution; ++z)
         {
-            for(var y = 0; y < resolution; ++y)
+            for(var y = 0; y < max_resolution; ++y)
             {
-                for(var x = 0; x < resolution; ++x)
+                for(var x = 0; x < max_resolution; ++x)
                 {
                     
-                    var volidx = z*resolution*resolution+y*resolution+x;
+                    var volidx = z*max_resolution*max_resolution+y*max_resolution+x;
                     
                     //cell completely outside.
                     if(volumeData[volidx] < 0)continue;
                     
                     var canProjectDirection = [];
+                    var adjacentCells = [];
                     
-                    //front, back, top, bottom, left, right
-                    var dir = [[0,0,1], [0,0,-1],[0,-1,0],
-                               [0,1,0],[-1,0,0],[1,0,0]];
-                               
                     //find the input images on which the cell can project.
                     //look at its 6 adjacent cells
                     for(var i = 0; i < 6; ++i){
@@ -374,13 +475,15 @@ function removeCell(volumeData, imagesData, colorData){
                             var nx = x + dir[i][0] * ray;
                             var ny = y + dir[i][1] * ray;
                             var nz = z + dir[i][2] * ray;
-                            if(outOfRange(nx,0,resolution-1) || outOfRange(ny,0,resolution-1) || outOfRange(nz,0,resolution-1)){
+                            if(outOfRange(nx,0,max_resolution-1) || outOfRange(ny,0,max_resolution-1) || outOfRange(nz,0,max_resolution-1)){
                                 //どのセルとも衝突しなかった
                                 break;
                             }
-                            var volidx2 = nz * resolution * resolution + ny * resolution + nx;
+                            var volidx2 = nz * max_resolution * max_resolution + ny * max_resolution + nx;
                             if(volumeData[volidx2] >= 0){
                                 //セルと衝突したので、この方向には投影できない
+                                
+                                if(ray == 1) adjacentCells.push(volidx2);//隣接しているセルを記録
                                 canProjection = false;
                                 break;
                             }
@@ -390,12 +493,11 @@ function removeCell(volumeData, imagesData, colorData){
                     }
                     
                     
-                    
                     //If the cell projects on several images, look up the corresponding pixel color on each image. 
                     //If the pixel colors are similar, then we keep the cell
-                    var idxFB = (y*resolution + x)*4;
-                    var idxLR = ((resolution-1-z)*resolution + y)*4;
-                    var idxTB = (x*resolution + resolution-1-z)*4;
+                    var idxFB = (y*max_resolution + x)*4;
+                    var idxLR = ((max_resolution-1-z)*max_resolution + y)*4;
+                    var idxTB = (x*max_resolution + max_resolution-1-z)*4;
                     
                     var colorFront = [front.data[idxFB], front.data[idxFB+1], front.data[idxFB+2]];
                     var colorBack = [back.data[idxFB], back.data[idxFB+1], back.data[idxFB+2]];
@@ -421,11 +523,11 @@ function removeCell(volumeData, imagesData, colorData){
                             var nx = x + dir[i][0];
                             var ny = y + dir[i][1];
                             var nz = z + dir[i][2];
-                            if(outOfRange(nx,0,resolution-1) || outOfRange(ny,0,resolution-1) || outOfRange(nz,0,resolution-1)){
+                            if(outOfRange(nx,0,max_resolution-1) || outOfRange(ny,0,max_resolution-1) || outOfRange(nz,0,max_resolution-1)){
                                 continue;
                             }
                             
-                            var idx2 = nz * resolution * resolution + ny * resolution + nx;
+                            var idx2 = nz * max_resolution * max_resolution + ny * max_resolution + nx;
                             var tr = (colorData[idx2] >> 16) & 0xff;
                             var tg = (colorData[idx2] >> 8) & 0xff;
                             var tb = colorData[idx2] & 0xff;
@@ -469,6 +571,13 @@ function removeCell(volumeData, imagesData, colorData){
                     //If the pixel colors are some ( or similar), then keep the cell.
                     //otherwase, discard it.
                     if(!someColor){
+                        //the adjacent cells sets 0 value.
+                        for(var i = 0; i < adjacentCells.length; ++i)
+                        {
+                            var idx = adjacentCells[i];
+                            volumeData[idx] = 0;
+                        }
+                        
                         volumeData[volidx] = -1;//outside
                         existsRemovableCell = true;
                     } else {
@@ -499,28 +608,12 @@ function isSomeColor(color0, color1){
 /////////////////////////////////////////////////////////////
 //ロード済みの画像からimageDataを作成
 //image.width * image.heightを
-//resolution * resolutionにリサイズする
-//そのままdrawImage(image, 0,0, resolution, resolution)でやると画像がぼけてしまうので
+//max_resolution * max_resolutionにリサイズする
+//そのままdrawImage(image, 0,0, max_resolution, max_resolution)でやると画像がぼけてしまうので
 //ぼけないようにリサイズする
 /////////////////////////////////////////////////////////////
 function createImageData(image, imgW, imgH){
     
-    if(imgW > resolution){
-        //volumeデータ１辺のサイズより入力画像のサイズがおおきい場合
-        //かなり汚くなるけどdrawImageによるリサイズを行う
-        canvas.width = resolution;
-        canvas.height = resolution;
-        
-        //黒で塗りつぶしてから画像を貼る
-        context.fillStyle = "rgb(0,0,0)";
-        context.fillRect(0,0,resolution, resolution);
-        context.drawImage(image,0,0,resolution,resolution);
-        var imageData = context.getImageData(0,0, resolution,resolution);
-        
-        return imageData;
-    }
-    else 
-    {
         //volumeデータ１辺のサイズが入力画像のサイズより小さい場合
         //fillRectを使用した画像のリサイズを行う
         //drawImageによるリサイズよりかなりきれいになる
@@ -535,13 +628,13 @@ function createImageData(image, imgW, imgH){
         var imageData = context.getImageData(0,0, imgW, imgH);
         
         //canvas黒で塗りつぶし
-        canvas.width = resolution;
-        canvas.height = resolution;
+        canvas.width = max_resolution;
+        canvas.height = max_resolution;
         context.fillStyle = "rgb(0,0,0)";
-        context.fillRect(0,0,resolution,resolution);
+        context.fillRect(0,0,max_resolution,max_resolution);
         
-        //imageDataをresolution*resolutionにリサイズする
-        var cellsize = resolution/imgW;
+        //imageDataをmax_resolution*max_resolutionにリサイズする
+        var cellsize = max_resolution/imgW;
         var src = imageData.data;
         
         for(var i = 0; i < imgH; ++i){
@@ -552,21 +645,23 @@ function createImageData(image, imgW, imgH){
             }
         }
         
-        var dstImageData = context.getImageData(0,0,resolution,resolution);
+        var dstImageData = context.getImageData(0,0,max_resolution,max_resolution);
         
         //canvas後始末
-        context.clearRect(0,0,resolution,resolution);
+        context.clearRect(0,0,max_resolution,max_resolution);
         canvas.width  = 0;
         canvas.height = 0;
         
         return dstImageData;
-    }
 }
 
 ///////////////////////////////////////////////////////////////
 //export current model data to obj file
 ////////////////////////////////////////////////////////////////
 function exportToObj() {
+    var obj = volToGeometory;
+    if(effect.visible) obj = effect;
+    
     //clear scene
     for( var i = 0; i < scene.children.length; i++ ) {
 		var current = scene.children[ i ];
@@ -577,7 +672,7 @@ function exportToObj() {
 		}
 	}
 	//add mesh
-    var geo = volToGeometory.generateGeometry();
+    var geo = obj.generateGeometry();
     var mesh = new THREE.Mesh(geo, materials[current_material]);
     scene.add(mesh);
     //export obj file
@@ -667,6 +762,12 @@ function render(){
     time += delta * effectController.speed * 0.5;
     controls.update(delta);
     
+    //marching cubes params
+    
+    if ( effectController.isolation !== effect.isolation ) {
+		effect.isolation = effectController.isolation;
+	}
+			
     //update morph
     if(morphState.isplaying){
         morphController.morph = clamp(morphController.morph + delta * morphController.speed,0,1);
@@ -803,11 +904,11 @@ function updateModel(object)
     var morph = morphController.morph;
     var czy, cz, idx;
     //三つの密度データを合わせた密度データを生成する
-    for(var z = 0; z < resolution; ++z){
-        cz = z * resolution * resolution;
-        for(var y = 0; y < resolution; ++y){
-            czy = cz + y * resolution;
-            for(var x = 0; x < resolution; ++x){
+    for(var z = 0; z < max_resolution; ++z){
+        cz = z * max_resolution * max_resolution;
+        for(var y = 0; y < max_resolution; ++y){
+            czy = cz + y * max_resolution;
+            for(var x = 0; x < max_resolution; ++x){
                 idx = czy + x;
                 volumeData[idx] = lerp(v0[idx], v1[idx], morph);
                 if(showColor)colorData[idx] = lerpBinaryColor(colorData0[idx], colorData1[idx], morph);
@@ -816,7 +917,13 @@ function updateModel(object)
         }
     }
     if(volToGeometory.visible) object.update(volumeData, colorData);//voxel modelを更新
-    else object.addExtrusionObject(volumeData, resolution, resolution, resolution, colorData);//マーチングキューブオブジェクトを更新
+    else {
+        if ( effectController.resolution !== resolution ) {
+		resolution = effectController.resolution;
+		object.init( Math.floor( resolution ) );
+        }
+        object.addExtrusionObject(volumeData, max_resolution, max_resolution, max_resolution, colorData);//マーチングキューブオブジェクトを更新
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -833,10 +940,10 @@ function createVolumeDataFrom2ImgData(imgData0, imgData1, rotateFlag){
     sArrays[1] = createSignedDistArrayFromImageData(imgData1);
     
     
-    var volumeData = new Float32Array(resolution*resolution*resolution);
+    var volumeData = new Float32Array(max_resolution*max_resolution*max_resolution);
     
     //signedDistArrayからボリュームデータを作成
-    getVolumeDataFrom2Img(resolution, resolution, resolution, sArrays[0], sArrays[1], volumeData, rotateFlag);
+    getVolumeDataFrom2Img(max_resolution, max_resolution, max_resolution, sArrays[0], sArrays[1], volumeData, rotateFlag);
     
     return volumeData;
 }
@@ -904,8 +1011,8 @@ function setupGui() {
 	material: "shiny",
 	speed: 1.0,
 	numBlobs: 10,
-	//resolution: 28,
-	isolation: 80,
+	resolution: 28,
+	isolation: 1,
 	floor: true,
 	wallx: false,
 	wallz: false,
@@ -1020,7 +1127,12 @@ function setupGui() {
 	h = gui.addFolder( "Rendering" );
 	h.add( effectController, "postprocessing" );
 	
-	//morph
+	//simulation
+	h = gui.addFolder( "Simulation" );
+	
+	h.add( effectController, "resolution", 14, max_resolution, 1 ).name("resolution (only MC)");
+	h.add( effectController, "isolation", 0, 1, 1 ).name("isolation (only MC)");
+    
 	morphController = {
 	    isplaying:false,
 	    play: function(){ morphState.isplaying = true;},
@@ -1032,11 +1144,12 @@ function setupGui() {
 	    morph: 0.0,
 	    speed: 0.5,
 	};
-	h = gui.addFolder( "Morphing" );
+	h.add( morphController , "changemorph").name("update (morph, resolution)");
+	
+	h = h.addFolder( "Morphing" );
 	
 	h.add( morphController , "morph",0.0, 1.0, 0.0).name("morph").listen();
 	h.add( morphController , "speed",-1, 1.0, 0.5);
-	h.add( morphController , "changemorph").name("update morph");
 	h.add( morphController , "play");
 	h.add( morphController , "stop");
 }
