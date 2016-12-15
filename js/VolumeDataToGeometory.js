@@ -18,6 +18,7 @@ THREE.VolumeDataToGeometory = function(resolution, material, enableColors){
         this.invsize = 1.0 / resolution;
         
         this.field = new Float32Array( this.size3 );
+        this.color_field = new Float32Array( this.size3 );
         
         // immediate render mode simulator
 
@@ -44,6 +45,7 @@ THREE.VolumeDataToGeometory = function(resolution, material, enableColors){
     this.reset = function(){
         for(var i = 0; i < this.size3; ++i){
             this.field[i] = 0.0;
+            this.color_field[i] = 0.0;
         }
         this.count = 0;
         this.count_cache = 0;
@@ -53,24 +55,49 @@ THREE.VolumeDataToGeometory = function(resolution, material, enableColors){
         return val < mn || mx < val;
     }
     
-    this.setVolumeData = function(volumeData){
-        for(var z = 0; z < resolution; ++z){
-            for(var y = 0; y < resolution; ++y){
-                for(var x = 0; x < resolution; ++x){
-                    var idx = z*this.size2 + y * this.size + x;
-                    this.field[idx] = volumeData[idx];
-                }
-            }
-        }
-    }
-    
     this.binaryColorToArray = function(bin)
     {
         return [((bin >> 16) & 0xff), ((bin >> 8) & 0xff), (bin & 0xff)];
     }
     
-    this.update = function(volumeData, colorData){
-        this.setVolumeData(volumeData);
+    this.setVolumeData = function(volumeData, volSize){
+        var scale = volSize / resolution;
+        var volSize2 = volSize * volSize;
+        
+        for(var z = 0; z < resolution; ++z){
+            for(var y = 0; y < resolution; ++y){
+                for(var x = 0; x < resolution; ++x){
+                    var idx = z*this.size2 + y * this.size + x;
+                    var idx2 = (z*scale+1) * volSize2 + (y*scale+1)*volSize + x*scale+1;
+                    this.field[idx] = volumeData[idx2];
+                }
+            }
+        }
+    }
+    
+    this.setColorData = function(colorData, volSize)
+    {
+        var scale = volSize / resolution;
+        var volSize2 = volSize * volSize;
+        
+        for(var z = 0; z < resolution; ++z){
+            for(var y = 0; y < resolution; ++y){
+                for(var x = 0; x < resolution; ++x){
+                    var idx = z*this.size2 + y * this.size + x;
+                    var idx2 = (z*scale+1) * volSize2 + (y*scale+1)*volSize + x*scale+1;
+                    
+                    this.color_field[idx] = colorData[idx2];
+                }
+            }
+        }
+    }
+    
+    this.update = function(volumeData, colorData, volSize){
+        this.setVolumeData(volumeData, volSize);
+        this.setColorData(colorData, volSize);
+        
+        var scale = volSize / resolution;
+        var volSize2 = volSize * volSize;
         
         //polygonization
         for(var x = 0; x < this.size; ++x){
@@ -78,7 +105,7 @@ THREE.VolumeDataToGeometory = function(resolution, material, enableColors){
                 for(var z = 0; z < this.size; ++z){
                     
                     var idx = z * this.size2 + (resolution-1-y) * this.size + x;
-                    
+                        
                     if(this.field[idx] >= 0){
                         
                         var noExistsAdjacentCells = [];
@@ -117,9 +144,9 @@ THREE.VolumeDataToGeometory = function(resolution, material, enableColors){
                                 this.normalArray[this.count*3 + 2] = cubeNormals[faceidx][2];
                                 
                                 if( this.enableColors ){
-                                    var color = this.binaryColorToArray(colorData[idx]);
+                                    var color = this.binaryColorToArray(this.color_field[idx]);
                                     var inv = 1.0/255.0;
-                                    this.colorArray[this.count*3+0] = color[0] * inv;//x * this.invsize;
+                                    this.colorArray[this.count*3+0] = color[0] * inv;//0 ~ 255 -> 0 ~ 1
                                     this.colorArray[this.count*3+1] = color[1] * inv;
                                     this.colorArray[this.count*3+2] = color[2] * inv;
                                 }

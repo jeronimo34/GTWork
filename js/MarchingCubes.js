@@ -100,11 +100,6 @@ THREE.MarchingCubes = function ( resolution, material, enableUvs, enableColors ,
 		nout[ offset + 1 ] = this.lerp( nc[ q + 1 ], nc[ q + 4 ], mu );
 		nout[ offset + 2 ] = this.lerp( nc[ q + 2 ], nc[ q + 5 ], mu );
 
-		/*
-		cout[offset]     = this.lerp(this.colorField[q], this.colorField[q+3], invmu);
-		cout[offset + 1] = this.lerp(this.colorField[q+1], this.colorField[q+4], invmu);
-		cout[offset + 2] = this.lerp(this.colorField[q+2], this.colorField[q+5], invmu);//this.colorField[q+2];
-		*/
 		cout[offset]     = this.lerp(this.colorField[q], this.colorField[q+3], invmu);
 		cout[offset + 1] = this.lerp(this.colorField[q+1], this.colorField[q+4], invmu);
 		cout[offset + 2] = this.lerp(this.colorField[q+2], this.colorField[q+5], invmu);//this.colorField[q+2];

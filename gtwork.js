@@ -23,7 +23,8 @@ var composer, effectFXAA, hblur, vblur;
 var effect;
 var volToGeometory;
 var resolution = 72;//default value
-var max_resolution = 100;//default value
+var max_resolution = 48;//default value
+var min_resolution = 16;
 
 //export obj data
 var exportButton, floatingDiv;
@@ -63,10 +64,11 @@ function init2DSpriteToVoxel(images0, images1){
     
     //resolution = image_size * 3
     max_resolution = images0[0].naturalWidth * 3;
+    min_resolution = images0[0].naturalWidth;
     resolution = max_resolution;
     console.log("resolution : " + resolution);
 
-
+    //create volumedata0, colordata0
     colorData0 = new Float32Array( resolution * resolution * resolution);
     volDataNotRmCell0 = new Float32Array( resolution * resolution * resolution);
     fbvolData0 = new Float32Array( resolution * resolution * resolution);
@@ -74,6 +76,7 @@ function init2DSpriteToVoxel(images0, images1){
     tbvolData0 = new Float32Array( resolution * resolution * resolution);
     volumeData0 = createVolumeData(images0,colorData0, fbvolData0, rlvolData0, tbvolData0, volDataNotRmCell0);
     
+    //create volumedata1, colordata1
     colorData1 = new Float32Array( resolution * resolution * resolution);
     volDataNotRmCell1 = new Float32Array( resolution * resolution * resolution);
     fbvolData1 = new Float32Array( resolution * resolution * resolution);
@@ -124,22 +127,6 @@ function init(images0, images1){
     current_material = "colors";
     materials = generateMaterials();
     
-    //volumeDataToGeometory
-    //volumeDataからvoxelModelを生成する
-    volToGeometory = new THREE.VolumeDataToGeometory(resolution, materials[ current_material ].m, true);//,side:THREE.DoubleSide
-    volToGeometory.position.set(0,0,0);
-    volToGeometory.scale.set(700, 700, 700);
-    
-    
-    //MARCHING CUBES
-    //空間の分割数、マテリアル、テクスチャ、カラー、CCW
-    effect = new THREE.MarchingCubes( resolution, materials[ current_material ].m, true, true , true);
-    effect.position.set(0,0,0);
-    effect.scale.set(700, 700, 700);
-    
-    effect.enableUvs = true;
-    effect.enableColors = true;
-    effect.visible = false;//最初は非表示
     
     //RENDERER
     renderer = new THREE.WebGLRenderer();
@@ -193,16 +180,29 @@ function init(images0, images1){
     
     //export obj data
     exportButton = document.getElementById( 'export' );
-    
 	exportButton.addEventListener( 'click', exportToObj);
 	floatingDiv = document.createElement( 'div' );
 	floatingDiv.className = 'floating';
 	container.appendChild( floatingDiv );
 	
-	
+	//volumeDataToGeometory
+    //volumeDataからvoxelModelを生成する
+    volToGeometory = new THREE.VolumeDataToGeometory(min_resolution, materials[ current_material ].m, true);//,side:THREE.DoubleSide
+    volToGeometory.position.set(0,0,0);
+    volToGeometory.scale.set(700, 700, 700);
+    
+    //MARCHING CUBES
+    //空間の分割数、マテリアル、テクスチャ、カラー、CCW
+    effect = new THREE.MarchingCubes( resolution, materials[ current_material ].m, true, true , true);
+    effect.position.set(0,0,0);
+    effect.scale.set(700, 700, 700);
+    effect.enableUvs = true;
+    effect.enableColors = true;
+    effect.visible = false;//最初は非表示
+    
 	//モデルをシーンに追加
     scene.add(volToGeometory);
-    volToGeometory.init(resolution);
+    //volToGeometory.init(min_resolution);
     updateModel(volToGeometory);
     volToGeometory.visible = false;
     
@@ -210,7 +210,6 @@ function init(images0, images1){
     effect.init(resolution);
     updateModel(effect);
     effect.visible = true;
-    //volToGeometory.visible = true;
     
     // environment map
     var cubeTextureLoader = new THREE.CubeTextureLoader();
@@ -520,17 +519,19 @@ function removeCell(volumeData, imagesData, colorData){
                         var r,g,b,cnt;
                         r = g = b = cnt = 0;
                         for(var i = 0; i < 6; ++i){
-                            var nx = x + dir[i][0];
-                            var ny = y + dir[i][1];
-                            var nz = z + dir[i][2];
+                            var nx = x + dir[i][0],
+                                ny = y + dir[i][1],
+                                nz = z + dir[i][2];
+                            
                             if(outOfRange(nx,0,max_resolution-1) || outOfRange(ny,0,max_resolution-1) || outOfRange(nz,0,max_resolution-1)){
                                 continue;
                             }
                             
-                            var idx2 = nz * max_resolution * max_resolution + ny * max_resolution + nx;
-                            var tr = (colorData[idx2] >> 16) & 0xff;
-                            var tg = (colorData[idx2] >> 8) & 0xff;
-                            var tb = colorData[idx2] & 0xff;
+                            var idx2 = nz * max_resolution * max_resolution + ny * max_resolution + nx,
+                                tr = (colorData[idx2] >> 16) & 0xff,
+                                tg = (colorData[idx2] >> 8) & 0xff,
+                                tb = colorData[idx2] & 0xff;
+                            
                             if( tr == 0 && tb == 0 && tg == 0)continue;
                             r += tr;
                             g += tg;
@@ -562,7 +563,6 @@ function removeCell(volumeData, imagesData, colorData){
                         //console.log("dir0" + dir0 + " dir1" + dir1);
                         
                         if(!isSomeColor(color0, color1)){
-                            //console.log(">>>color0 : " + color0 + "color1 : " + color1);
                             someColor = false;
                             break;
                         }
@@ -758,12 +758,10 @@ function render(){
     
     //update
     var delta = clock.getDelta();
-
     time += delta * effectController.speed * 0.5;
     controls.update(delta);
     
     //marching cubes params
-    
     if ( effectController.isolation !== effect.isolation ) {
 		effect.isolation = effectController.isolation;
 	}
@@ -911,16 +909,22 @@ function updateModel(object)
             for(var x = 0; x < max_resolution; ++x){
                 idx = czy + x;
                 volumeData[idx] = lerp(v0[idx], v1[idx], morph);
-                if(showColor)colorData[idx] = lerpBinaryColor(colorData0[idx], colorData1[idx], morph);
+                if(showColor) colorData[idx] = lerpBinaryColor(colorData0[idx], colorData1[idx], morph);
                 else colorData[idx] = 0;
             }
         }
     }
-    if(volToGeometory.visible) object.update(volumeData, colorData);//voxel modelを更新
-    else {
+    
+    if(volToGeometory.visible){
+        //voxel
+        object.update(volumeData, colorData, max_resolution);//voxel modelを更新  
+    } 
+    else 
+    {
+        //marching cubes
         if ( effectController.resolution !== resolution ) {
-		resolution = effectController.resolution;
-		object.init( Math.floor( resolution ) );
+		    resolution = effectController.resolution;
+		    object.init( Math.floor( resolution ) );
         }
         object.addExtrusionObject(volumeData, max_resolution, max_resolution, max_resolution, colorData);//マーチングキューブオブジェクトを更新
     }
@@ -1130,7 +1134,7 @@ function setupGui() {
 	//simulation
 	h = gui.addFolder( "Simulation" );
 	
-	h.add( effectController, "resolution", 14, max_resolution, 1 ).name("resolution (only MC)");
+	h.add( effectController, "resolution", min_resolution, max_resolution, 1 ).name("resolution (only MC)");
 	h.add( effectController, "isolation", 0, 1, 1 ).name("isolation (only MC)");
     
 	morphController = {
